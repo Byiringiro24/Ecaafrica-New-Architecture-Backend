@@ -1,0 +1,20 @@
+﻿[Unit]
+Description=EcaAfrica Backend API
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=ecareafrica
+Group=ecareafrica
+WorkingDirectory=/srv/ecareafrica/Ecareafrica_backend
+EnvironmentFile=/etc/ecareafrica/backend.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /srv/ecareafrica/Ecareafrica_backend/dist/server.js
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

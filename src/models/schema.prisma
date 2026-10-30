@@ -1,0 +1,3085 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+model subscription_plans {
+  id                   BigInt                 @id @default(autoincrement())
+  name                 String                 @db.VarChar(100)
+  price_monthly        Decimal                @default(0) @db.Decimal(12, 2)
+  price_annual         Decimal                @default(0) @db.Decimal(12, 2)
+  student_limit        Int                    @default(0)
+  staff_limit          Int                    @default(0)
+  sms_bundle           Int                    @default(0)
+  features             Json?
+  is_active            Boolean                @default(true)
+  sort_order           Int                    @default(0) @db.SmallInt
+  created_at           DateTime               @default(now()) @db.Timestamptz(3)
+  updated_at           DateTime               @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at           DateTime?              @db.Timestamptz(3)
+  school_subscriptions school_subscriptions[]
+  schools              schools[]
+
+  @@index([created_at])
+  @@index([updated_at])
+  @@index([deleted_at])
+}
+
+model schools {
+  id                               BigInt                             @id @default(autoincrement())
+  uuid                             String                             @unique @db.Char(36)
+  name                             String                             @db.VarChar(255)
+  school_type                      SchoolType                         @default(government)
+  province                         String                             @db.VarChar(100)
+  district                         String                             @db.VarChar(100)
+  sector                           String?                            @db.VarChar(100)
+  logo_url                         String?                            @db.VarChar(500)
+  website                          String?                            @db.VarChar(255)
+  principal_name                   String?                            @db.VarChar(255)
+  principal_phone                  String?                            @db.VarChar(20)
+  principal_email                  String?                            @db.VarChar(255)
+  school_phone                     String?                            @db.VarChar(20)
+  school_email                     String?                            @db.VarChar(255)
+  subscription_plan_id             BigInt?
+  status                           SchoolStatus                       @default(trial)
+  trial_ends_at                    DateTime?                          @db.Timestamptz(3)
+  grace_ends_at                    DateTime?                          @db.Timestamptz(3)
+  timezone                         String                             @default("Africa/Kampala") @db.VarChar(50)
+  currency                         String                             @default("RWF") @db.Char(3)
+  has_boarding                     Boolean                            @default(false)
+  has_biometrics                   Boolean                            @default(false)
+  has_gate                         Boolean                            @default(false)
+  has_visitor_mgmt                 Boolean                            @default(false)
+  has_exam_system                  Boolean                            @default(false)
+  has_salary_mgmt                  Boolean                            @default(false)
+  has_parent_app                   Boolean                            @default(false)
+  has_bulk_sms                     Boolean                            @default(false)
+  settings                         Json?
+  created_at                       DateTime                           @default(now()) @db.Timestamptz(3)
+  updated_at                       DateTime                           @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at                       DateTime?                          @db.Timestamptz(3)
+  country                          String?                            @db.VarChar(100)
+  absence_alerts                   absence_alerts[]
+  academic_years                   academic_years[]
+  announcement_reads               announcement_reads[]
+  attendance_records               attendance_records[]
+  attendance_logs                  attendance_logs[]
+  attendance_sessions              attendance_sessions[]
+  biometric_enrollments            biometric_enrollments[]
+  boarding_roll_calls              boarding_roll_calls[]
+  dormitory_supervisor_assignments dormitory_supervisor_assignments[]
+  classes                          classes[]
+  device_sessions                  device_sessions[]
+  devices                          devices[]
+  dorm_rooms                       dorm_rooms[]
+  dormitories                      dormitories[]
+  exam_results                     exam_results[]
+  exams                            exams[]
+  exam_types                       exam_types[]
+  grading_roles                    grading_roles[]
+  report_cards                     report_cards[]
+  expenses                         expenses[]
+  expense_categories               expense_categories[]
+  inventory_categories             inventory_categories[]
+  fee_structures                   fee_structures[]
+  fee_transactions                 fee_transactions[]
+  gate_logs                        gate_logs[]
+  holidays                         holidays[]
+  inventory_items                  inventory_items[]
+  invoices                         invoices[]
+  payroll_runs                     payroll_runs[]
+  payslips                         payslips[]
+  suppliers                        suppliers[]
+  student_invoices                 student_invoices[]
+  messages                         messages[]
+  notification_logs                notification_logs[]
+  notification_templates           notification_templates[]
+  attendance_sms_mappings          attendance_sms_mappings[]
+  offline_sync_queue               offline_sync_queue[]
+  parents_guardians                parents_guardians[]
+  platform_user_school_assignments platform_user_school_assignments[]
+  roles                            roles[]
+  salary_records                   salary_records[]
+  school_levels                    school_levels[]
+  school_subscriptions             school_subscriptions[]
+  subscription_plan                subscription_plans?                @relation(fields: [subscription_plan_id], references: [id])
+  sections                         sections[]
+  staff_leave_balances             staff_leave_balances[]
+  staff_profiles                   staff_profiles[]
+  student_dorm_assignments         student_dorm_assignments[]
+  student_fee_assignments          student_fee_assignments[]
+  student_leave_requests           student_leave_requests[]
+  student_section_enrollments      student_section_enrollments[]
+  students                         students[]
+  subjects                         subjects[]
+  support_tickets                  support_tickets[]
+  tablets                          tablets[]
+  teacher_section_subjects         teacher_section_subjects[]
+  terms                            terms[]
+  timetable_periods                timetable_periods[]
+  timetable_slots                  timetable_slots[]
+  user_roles                       user_roles[]
+  users                            users[]
+  visitor_appointments             visitor_appointments[]
+  visitor_visits                   visitor_visits[]
+  visitors                         visitors[]
+  boarding_attendance_windows      boarding_attendance_windows[]
+  boarding_attendance_sessions     boarding_attendance_sessions[]
+  boarding_attendance_records      boarding_attendance_records[]
+  boarding_configurations          boarding_configurations?
+  dos_work_items                   dos_work_items[]
+  dining_menus                     dining_menus[]
+  dining_menu_items                dining_menu_items[]
+  dining_schedules                 dining_schedules[]
+  dining_sessions                  dining_sessions[]
+  dining_attendance                dining_attendance[]
+  gate_exit_records                gate_exit_records[]
+  patron_dormitory_assignments     patron_dormitory_assignments[]
+  dining_teacher_assignments       dining_teacher_assignments[]
+  subject_combinations              subject_combinations[]
+  class_combinations                class_combinations[]
+  combination_subjects              combination_subjects[]
+
+  @@index([status])
+  @@index([country])
+  @@index([province])
+  @@index([trial_ends_at])
+  @@index([grace_ends_at])
+  @@index([created_at])
+  @@index([updated_at])
+  @@index([deleted_at])
+}
+
+model school_subscriptions {
+  id                  BigInt                   @id @default(autoincrement())
+  school_id           BigInt
+  plan_id             BigInt
+  billing_cycle       BillingCycle             @default(monthly)
+  amount              Decimal                  @db.Decimal(12, 2)
+  currency            String                   @default("RWF") @db.Char(3)
+  status              SchoolSubscriptionStatus @default(pending)
+  starts_at           DateTime                 @db.Timestamptz(3)
+  ends_at             DateTime?                @db.Timestamptz(3)
+  trial_ends_at       DateTime?                @db.Timestamptz(3)
+  grace_ends_at       DateTime?                @db.Timestamptz(3)
+  auto_renew          Boolean                  @default(true)
+  cancelled_at        DateTime?                @db.Timestamptz(3)
+  cancellation_reason String?
+  notes               String?
+  created_by          BigInt?
+  created_at          DateTime                 @default(now()) @db.Timestamptz(3)
+  updated_at          DateTime                 @default(now()) @updatedAt @db.Timestamptz(3)
+  invoices            invoices[]
+  plan                subscription_plans       @relation(fields: [plan_id], references: [id])
+  school              schools                  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([status])
+  @@index([starts_at])
+  @@index([ends_at])
+  @@index([trial_ends_at])
+  @@index([grace_ends_at])
+  @@index([cancelled_at])
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model invoices {
+  id              BigInt                @id @default(autoincrement())
+  invoice_number  String                @unique @db.VarChar(30)
+  school_id       BigInt
+  subscription_id BigInt?
+  period_start    DateTime              @db.Date
+  period_end      DateTime              @db.Date
+  issue_date      DateTime              @db.Date
+  due_date        DateTime              @db.Date
+  subtotal        Decimal               @default(0) @db.Decimal(12, 2)
+  tax_rate        Decimal               @default(0) @db.Decimal(5, 2)
+  tax_amount      Decimal               @default(0) @db.Decimal(12, 2)
+  discount_amount Decimal               @default(0) @db.Decimal(12, 2)
+  total           Decimal               @default(0) @db.Decimal(12, 2)
+  currency        String                @default("RWF") @db.Char(3)
+  status          InvoiceStatus         @default(draft)
+  paid_at         DateTime?             @db.Timestamptz(3)
+  payment_method  String?               @db.VarChar(50)
+  payment_ref     String?               @db.VarChar(100)
+  notes           String?
+  pdf_url         String?               @db.VarChar(500)
+  created_by      BigInt?
+  created_at      DateTime              @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime              @default(now()) @updatedAt @db.Timestamptz(3)
+  line_items      invoice_line_items[]
+  school          schools               @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  subscription    school_subscriptions? @relation(fields: [subscription_id], references: [id])
+
+  @@index([school_id])
+  @@index([status])
+  @@index([period_start])
+  @@index([period_end])
+  @@index([issue_date])
+  @@index([due_date])
+  @@index([paid_at])
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model invoice_line_items {
+  id          BigInt   @id @default(autoincrement())
+  invoice_id  BigInt
+  description String   @db.VarChar(255)
+  quantity    Decimal  @default(1) @db.Decimal(10, 2)
+  unit_price  Decimal  @db.Decimal(12, 2)
+  total       Decimal  @db.Decimal(12, 2)
+  sort_order  Int      @default(0) @db.SmallInt
+  invoice     invoices @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+}
+
+model platform_users {
+  id                               BigInt                             @id @default(autoincrement())
+  uuid                             String                             @unique @db.Char(36)
+  name                             String                             @db.VarChar(255)
+  email                            String                             @unique @db.VarChar(255)
+  password_hash                    String                             @db.VarChar(255)
+  role                             PlatformUserRole                   @default(support)
+  access_scope                     PlatformUserAccessScope            @default(all)
+  permissions                      Json?
+  status                           PlatformUserStatus                 @default(active)
+  last_login_at                    DateTime?                          @db.Timestamptz(3)
+  created_at                       DateTime                           @default(now()) @db.Timestamptz(3)
+  updated_at                       DateTime                           @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at                       DateTime?                          @db.Timestamptz(3)
+  announcements                    announcements[]
+  platform_user_school_assignments platform_user_school_assignments[]
+  sessions                         sessions[]
+  support_tickets                  support_tickets[]
+
+  @@index([status])
+  @@index([last_login_at])
+  @@index([created_at])
+  @@index([updated_at])
+  @@index([deleted_at])
+}
+
+model platform_user_school_assignments {
+  id               BigInt         @id @default(autoincrement())
+  platform_user_id BigInt
+  school_id        BigInt
+  created_at       DateTime       @default(now()) @db.Timestamptz(3)
+  platform_user    platform_users @relation(fields: [platform_user_id], references: [id], onDelete: Cascade)
+  school           schools        @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@unique([platform_user_id, school_id])
+  @@index([school_id])
+  @@index([created_at])
+}
+
+model announcements {
+  id                 BigInt                  @id @default(autoincrement())
+  title              String                  @db.VarChar(255)
+  body               String
+  type               AnnouncementType        @default(info)
+  target_scope       AnnouncementTargetScope @default(all)
+  target_values      Json?
+  status             AnnouncementStatus      @default(draft)
+  scheduled_at       DateTime?               @db.Timestamptz(3)
+  sent_at            DateTime?               @db.Timestamptz(3)
+  send_inapp         Boolean                 @default(true)
+  send_email         Boolean                 @default(false)
+  created_by         BigInt?
+  created_at         DateTime                @default(now()) @db.Timestamptz(3)
+  updated_at         DateTime                @default(now()) @updatedAt @db.Timestamptz(3)
+  announcement_reads announcement_reads[]
+  created_by_user    platform_users?         @relation(fields: [created_by], references: [id])
+
+  @@index([status])
+  @@index([scheduled_at])
+  @@index([sent_at])
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model announcement_reads {
+  id              BigInt        @id @default(autoincrement())
+  announcement_id BigInt
+  school_id       BigInt
+  user_id         BigInt?
+  read_at         DateTime      @default(now()) @db.Timestamptz(3)
+  announcement    announcements @relation(fields: [announcement_id], references: [id], onDelete: Cascade)
+  school          schools       @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@unique([announcement_id, school_id])
+  @@index([school_id])
+  @@index([read_at])
+}
+
+model support_tickets {
+  id                     BigInt                    @id @default(autoincrement())
+  ticket_number          String                    @unique @db.VarChar(20)
+  school_id              BigInt
+  opened_by              BigInt?
+  assigned_to            BigInt?
+  subject                String                    @db.VarChar(255)
+  category               SupportTicketCategory     @default(technical)
+  priority               SupportTicketPriority     @default(medium)
+  status                 SupportTicketStatus       @default(open)
+  audience               SupportTicketAudience     @default(platform_admin)
+  resolved_at            DateTime?                 @db.Timestamptz(3)
+  created_at             DateTime                  @default(now()) @db.Timestamptz(3)
+  updated_at             DateTime                  @default(now()) @updatedAt @db.Timestamptz(3)
+  messages               support_ticket_messages[]
+  assigned_platform_user platform_users?           @relation(fields: [assigned_to], references: [id])
+  school                 schools                   @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([status])
+  @@index([resolved_at])
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model support_ticket_messages {
+  id          BigInt                  @id @default(autoincrement())
+  ticket_id   BigInt
+  sender_type SupportTicketSenderType
+  sender_id   BigInt
+  body        String
+  is_internal Boolean                 @default(false)
+  created_at  DateTime                @default(now()) @db.Timestamptz(3)
+  ticket      support_tickets         @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at])
+}
+
+model demo_requests {
+  id                 String   @id @default(uuid()) @db.Char(36)
+  school_name        String   @db.VarChar(255)
+  country            String   @db.VarChar(100)
+  country_code       String   @db.Char(2)
+  phone_country_code String   @db.VarChar(8)
+  contact_name       String   @db.VarChar(255)
+  job_title          String   @db.VarChar(255)
+  phone              String   @db.VarChar(30)
+  whatsapp           Boolean  @default(false)
+  email              String   @db.VarChar(255)
+  student_count      Int
+  teacher_count      Int
+  staff_count        Int
+  has_current_system Boolean  @default(false)
+  current_software   String?  @db.VarChar(255)
+  modules            Json
+  preferred_date     String?  @db.VarChar(20)
+  preferred_time     String?  @db.VarChar(30)
+  additional_details String?
+  consent            Boolean  @default(false)
+  status             String   @default("Pending") @db.VarChar(20)
+  created_at         DateTime @default(now()) @db.Timestamptz(3)
+  updated_at         DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([status])
+  @@index([created_at])
+  @@index([email])
+}
+
+model users {
+  id                              BigInt                     @id @default(autoincrement())
+  uuid                            String                     @unique @db.Char(36)
+  school_id                       BigInt
+  name                            String                     @db.VarChar(255)
+  email                           String?                    @db.VarChar(255)
+  phone                           String?                    @db.VarChar(20)
+  password_hash                   String                     @db.VarChar(255)
+  role                            UserRole
+  status                          UserStatus                 @default(pending)
+  avatar_url                      String?                    @db.VarChar(500)
+  last_login_at                   DateTime?                  @db.Timestamptz(3)
+  email_verified                  Boolean                    @default(false)
+  created_at                      DateTime                   @default(now()) @db.Timestamptz(3)
+  updated_at                      DateTime                   @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at                      DateTime?                  @db.Timestamptz(3)
+  resolved_absence_alerts              absence_alerts[]
+  attendance_records                   attendance_records[]
+  attendance_sessions                  attendance_sessions[]
+  exams                                exams[]
+  published_exams                      exams[]                          @relation("exam_publisher")
+  prepared_report_cards                report_cards[]                   @relation("report_card_preparer")
+  approved_expenses                    expenses[]                       @relation("expense_approver")
+  created_expenses                     expenses[]                       @relation("expense_creator")
+  approved_payroll_runs                payroll_runs[]                   @relation("payroll_run_approver")
+  fee_transactions                     fee_transactions[]
+  parents_guardians                    parents_guardians[]
+  class_teacher_sections               sections[]
+  sessions                             sessions[]
+  staff_profiles                       staff_profiles[]
+  approved_student_leave_requests      student_leave_requests[]         @relation("leave_approved_by")
+  created_student_leave_requests       student_leave_requests[]         @relation("leave_created_by")
+  gatekeeper_leave_requests            student_leave_requests[]         @relation("leave_gate_keeper")
+  students                             students[]
+  teacher_section_subjects             teacher_section_subjects[]
+  timetable_slots                      timetable_slots[]
+  user_roles                           user_roles[]
+  school                               schools                          @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  visitor_appointments                 visitor_appointments[]
+  visitor_visits                       visitor_visits[]
+  patron_dormitory_assignments         patron_dormitory_assignments[]   @relation("patron_assignments")
+  patron_assignments_made              patron_dormitory_assignments[]   @relation("patron_assigned_by")
+  device_assignments_made              devices[]                        @relation("device_assigned_by")
+  confirmed_gate_exits                 gate_exit_records[]              @relation("exit_gate_keeper")
+  boarding_att_windows_created         boarding_attendance_windows[]    @relation("att_window_created_by")
+  boarding_att_records_corrected       boarding_attendance_records[]    @relation("att_corrected_by")
+  dining_menus_created                 dining_menus[]                   @relation("dining_menu_creator")
+  dining_schedules_created             dining_schedules[]               @relation("dining_sched_creator")
+  dining_sessions_marked               dining_sessions[]                @relation("dining_session_marker")
+  dining_attendance_marked             dining_attendance[]              @relation("dining_att_marker")
+  dining_teacher_assignments           dining_teacher_assignments[]
+
+  @@unique([school_id, email])
+  @@index([school_id])
+  @@index([role])
+  @@index([status])
+  @@index([last_login_at])
+  @@index([created_at])
+  @@index([updated_at])
+  boarding_sessions_created boarding_attendance_sessions[] @relation("boarding_session_creator")
+  @@index([deleted_at])
+}
+
+model roles {
+  id          BigInt       @id @default(autoincrement())
+  school_id   BigInt
+  name        String       @db.VarChar(100)
+  slug        String       @db.VarChar(100)
+  permissions Json
+  is_system   Boolean      @default(false)
+  created_at  DateTime     @default(now()) @db.Timestamptz(3)
+  updated_at  DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at  DateTime?    @db.Timestamptz(3)
+  school      schools      @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  user_roles  user_roles[]
+
+  @@unique([school_id, slug])
+  @@index([school_id])
+  @@index([created_at])
+  @@index([updated_at])
+  @@index([deleted_at])
+}
+
+model user_roles {
+  id        BigInt  @id @default(autoincrement())
+  user_id   BigInt
+  role_id   BigInt
+  school_id BigInt
+  role      roles   @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  school    schools @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  user      users   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, role_id])
+  @@index([school_id])
+}
+
+model sessions {
+  id               BigInt          @id @default(autoincrement())
+  user_id          BigInt?
+  platform_user_id BigInt?
+  school_id        BigInt?
+  token_hash       String          @unique @db.VarChar(255)
+  ip_address       String?         @db.VarChar(45)
+  user_agent       String?         @db.VarChar(500)
+  expires_at       DateTime        @db.Timestamptz(3)
+  revoked_at       DateTime?       @db.Timestamptz(3)
+  created_at       DateTime        @default(now()) @db.Timestamptz(3)
+  platform_user    platform_users? @relation(fields: [platform_user_id], references: [id], onDelete: Cascade)
+  user             users?          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([platform_user_id])
+  @@index([expires_at])
+  @@index([revoked_at])
+  @@index([created_at])
+}
+
+model academic_years {
+  id                          BigInt                        @id @default(autoincrement())
+  school_id                   BigInt
+  name                        String                        @db.VarChar(50)
+  start_date                  DateTime                      @db.Date
+  end_date                    DateTime                      @db.Date
+  is_current                  Boolean                       @default(false)
+  created_at                  DateTime                      @default(now()) @db.Timestamptz(3)
+  deleted_at                  DateTime?                     @db.Timestamptz(3)
+  school                      schools                       @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  fee_structures              fee_structures[]
+  student_invoices            student_invoices[]
+  staff_leave_balances        staff_leave_balances[]
+  student_dorm_assignments    student_dorm_assignments[]
+  student_section_enrollments student_section_enrollments[]
+  terms                       terms[]
+
+  @@unique([school_id, name])
+  @@index([school_id])
+  @@index([start_date])
+  @@index([end_date])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model terms {
+  id                       BigInt                     @id @default(autoincrement())
+  school_id                BigInt
+  academic_year_id         BigInt
+  name                     String                     @db.VarChar(50)
+  start_date               DateTime                   @db.Date
+  end_date                 DateTime                   @db.Date
+  is_current               Boolean                    @default(false)
+  created_at               DateTime                   @default(now()) @db.Timestamptz(3)
+  deleted_at               DateTime?                  @db.Timestamptz(3)
+  fee_structures           fee_structures[]
+  student_invoices         student_invoices[]
+  report_cards             report_cards[]
+  teacher_section_subjects teacher_section_subjects[]
+  academic_year            academic_years             @relation(fields: [academic_year_id], references: [id], onDelete: Cascade)
+  school                   schools                    @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([start_date])
+  @@index([end_date])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model classes {
+  id               BigInt           @id @default(autoincrement())
+  school_id        BigInt
+  academic_year_id BigInt?
+  name             String           @db.VarChar(20)
+  level            Int              @db.SmallInt
+  description      String?          @db.VarChar(255)
+  created_at       DateTime         @default(now()) @db.Timestamptz(3)
+  deleted_at       DateTime?        @db.Timestamptz(3)
+  level_id         BigInt?
+  level_label      String?          @db.VarChar(100)
+  level_record     school_levels?   @relation(fields: [level_id], references: [id])
+  school           schools          @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  dining_schedules dining_schedules[]
+  dining_sessions  dining_sessions[]
+  fee_structures   fee_structures[]
+  sections         sections[]
+  class_combinations class_combinations[]
+
+  @@unique([school_id, name, academic_year_id])
+  @@index([school_id])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model school_levels {
+  id         BigInt    @id @default(autoincrement())
+  school_id  BigInt
+  label      String    @db.VarChar(100)
+  sort_order Int       @default(0) @db.SmallInt
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now()) @db.Timestamptz(3)
+  deleted_at DateTime? @db.Timestamptz(3)
+  classes    classes[]
+  school     schools   @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@unique([school_id, label])
+  @@index([school_id])
+  @@index([sort_order])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model sections {
+  id                          BigInt                        @id @default(autoincrement())
+  school_id                   BigInt
+  class_id                    BigInt
+  name                        String                        @db.VarChar(10)
+  full_name                   String                        @db.VarChar(20)
+  class_teacher_id            BigInt?
+  capacity                    Int                           @default(40) @db.SmallInt
+  room                        String?                       @db.VarChar(50)
+  created_at                  DateTime                      @default(now()) @db.Timestamptz(3)
+  deleted_at                  DateTime?                     @db.Timestamptz(3)
+  attendance_sessions         attendance_sessions[]
+  exams                       exams[]
+  class                       classes                       @relation(fields: [class_id], references: [id], onDelete: Cascade)
+  class_teacher               users?                        @relation(fields: [class_teacher_id], references: [id])
+  school                      schools                       @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student_section_enrollments student_section_enrollments[]
+  teacher_section_subjects    teacher_section_subjects[]
+  timetable_slots             timetable_slots[]
+
+  @@unique([school_id, class_id, name])
+  @@index([school_id])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model subjects {
+  id                       BigInt                     @id @default(autoincrement())
+  school_id                BigInt
+  name                     String                     @db.VarChar(100)
+  code                     String?                    @db.VarChar(20)
+  description              String?                    @db.VarChar(255)
+  is_active                Boolean                    @default(false)
+  created_at               DateTime                   @default(now()) @db.Timestamptz(3)
+  deleted_at               DateTime?                  @db.Timestamptz(3)
+  exams                    exams[]
+  attendance_sessions      attendance_sessions[]
+  school                   schools                    @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  teacher_section_subjects teacher_section_subjects[]
+  timetable_slots          timetable_slots[]
+  combination_subjects     combination_subjects[]
+
+  @@unique([school_id, name])
+  @@index([school_id])
+  @@index([created_at])
+  @@index([is_active])
+  @@index([deleted_at])
+}
+
+model subject_combinations {
+  id          BigInt       @id @default(autoincrement())
+  school_id   BigInt
+  code        String       @db.VarChar(20)
+  name        String       @db.VarChar(100)
+  description String?      @db.VarChar(255)
+  is_active   Boolean      @default(true)
+  created_at  DateTime     @default(now()) @db.Timestamptz(3)
+  deleted_at  DateTime?    @db.Timestamptz(3)
+  school      schools      @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  classes     class_combinations[]
+  subjects    combination_subjects[]
+
+  @@unique([school_id, code])
+  @@index([school_id])
+  @@index([deleted_at])
+}
+
+model class_combinations {
+  id             BigInt              @id @default(autoincrement())
+  school_id      BigInt
+  class_id       BigInt
+  combination_id BigInt
+  created_at     DateTime            @default(now()) @db.Timestamptz(3)
+  school         schools             @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  class_record   classes             @relation(fields: [class_id], references: [id], onDelete: Cascade)
+  combination    subject_combinations @relation(fields: [combination_id], references: [id], onDelete: Cascade)
+
+  @@unique([class_id, combination_id])
+  @@index([school_id])
+  @@index([combination_id])
+}
+
+model combination_subjects {
+  id             BigInt              @id @default(autoincrement())
+  school_id      BigInt
+  combination_id BigInt
+  subject_id     BigInt
+  created_at     DateTime            @default(now()) @db.Timestamptz(3)
+  school         schools             @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  combination    subject_combinations @relation(fields: [combination_id], references: [id], onDelete: Cascade)
+  subject        subjects            @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+
+  @@unique([combination_id, subject_id])
+  @@index([school_id])
+  @@index([subject_id])
+}
+
+model teacher_section_subjects {
+  id         BigInt    @id @default(autoincrement())
+  school_id  BigInt
+  teacher_id BigInt
+  section_id BigInt
+  subject_id BigInt
+  term_id    BigInt?
+  created_at DateTime  @default(now()) @db.Timestamptz(3)
+  deleted_at DateTime? @db.Timestamptz(3)
+  school     schools   @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  section    sections  @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  subject    subjects  @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+  teacher    users     @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+  term       terms?    @relation(fields: [term_id], references: [id])
+
+  @@unique([teacher_id, section_id, subject_id, term_id])
+  @@index([school_id])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model timetable_periods {
+  id                  BigInt                @id @default(autoincrement())
+  school_id           BigInt
+  name                String                @db.VarChar(30)
+  start_time          DateTime              @db.Time(6)
+  end_time            DateTime              @db.Time(6)
+  is_break            Boolean               @default(false)
+  sort_order          Int                   @default(0) @db.SmallInt
+  deleted_at          DateTime?             @db.Timestamptz(3)
+  attendance_sessions attendance_sessions[]
+  school              schools               @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  timetable_slots     timetable_slots[]
+
+  @@index([school_id])
+  @@index([deleted_at])
+}
+
+model timetable_slots {
+  id          BigInt            @id @default(autoincrement())
+  school_id   BigInt
+  section_id  BigInt
+  subject_id  BigInt
+  teacher_id  BigInt
+  period_id   BigInt
+  day_of_week Int               @db.SmallInt
+  room        String?           @db.VarChar(50)
+  term_id     BigInt?
+  deleted_at  DateTime?         @db.Timestamptz(3)
+  period      timetable_periods @relation(fields: [period_id], references: [id], onDelete: Cascade)
+  school      schools           @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  section     sections          @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  subject     subjects          @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+  teacher     users             @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([deleted_at])
+}
+
+model holidays {
+  id         BigInt      @id @default(autoincrement())
+  school_id  BigInt
+  name       String      @db.VarChar(100)
+  start_date DateTime    @db.Date
+  end_date   DateTime    @db.Date
+  type       HolidayType @default(school)
+  created_at DateTime    @default(now()) @db.Timestamptz(3)
+  deleted_at DateTime?   @db.Timestamptz(3)
+  school     schools     @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([start_date])
+  @@index([end_date])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model students {
+  id                          BigInt                        @id @default(autoincrement())
+  uuid                        String                        @unique @db.Char(36)
+  school_id                   BigInt
+  user_id                     BigInt?
+  student_school_id           BigInt?
+  student_id_number           String?                       @db.VarChar(30)
+  first_name                  String                        @db.VarChar(100)
+  last_name                   String                        @db.VarChar(100)
+  other_names                 String?                       @db.VarChar(100)
+  combination                 String?                       @db.VarChar(20)
+  date_of_birth               DateTime?                     @db.Date
+  visitor_access_restricted   Boolean                       @default(false)
+  gender                      Gender?
+  national_id                 String?                       @db.VarChar(30)
+  nationality                 String                        @default("Rwandan") @db.VarChar(50)
+  religion                    String?                       @db.VarChar(50)
+  blood_group                 String?                       @db.VarChar(5)
+  photo_url                   String?                       @db.VarChar(500)
+  address                     String?
+  previous_school             String?                       @db.VarChar(255)
+  admission_date              DateTime?                     @db.Date
+  student_type                StudentType                   @default(day)
+  status                      StudentStatus                 @default(active)
+  boarding_status             BoardingStatus                @default(in_school)
+  created_at                  DateTime                      @default(now()) @db.Timestamptz(3)
+  updated_at                  DateTime                      @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at                  DateTime?                     @db.Timestamptz(3)
+  device_sync_status          String?                       @db.VarChar(20)
+  device_user_id              String?                       @db.VarChar(50)
+  last_device_sync            DateTime?                     @db.Timestamptz(3)
+  absence_alerts              absence_alerts[]
+  attendance_records          attendance_records[]
+  biometric_enrollments       biometric_enrollments[]
+  boarding_attendance_records boarding_attendance_records[]
+  boarding_roll_call_records  boarding_roll_call_records[]
+  dining_attendance           dining_attendance[]
+  exam_results                exam_results[]
+  gate_exit_records           gate_exit_records[]
+  report_cards                report_cards[]
+  fee_transactions            fee_transactions[]
+  gate_logs                   gate_logs[]
+  student_dorm_assignments    student_dorm_assignments[]
+  student_fee_assignments     student_fee_assignments[]
+  student_invoices            student_invoices[]
+  student_leave_requests      student_leave_requests[]
+  student_parent_links        student_parent_links[]
+  student_section_enrollments student_section_enrollments[]
+  school                      schools                       @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  user                        users?                        @relation(fields: [user_id], references: [id])
+  visitor_appointments        visitor_appointments[]
+  visitor_visits              visitor_visits[]
+
+  @@unique([school_id, student_school_id])
+  @@index([school_id])
+  @@index([status])
+  @@index([student_type])
+  @@index([boarding_status])
+  @@index([date_of_birth])
+  @@index([admission_date])
+  @@index([device_user_id])
+  @@index([device_sync_status])
+  @@index([student_school_id])
+  @@index([created_at])
+  @@index([updated_at])
+  @@index([deleted_at])
+}
+
+model student_section_enrollments {
+  id               BigInt           @id @default(autoincrement())
+  school_id        BigInt
+  student_id       BigInt
+  section_id       BigInt
+  term_id          BigInt?
+  academic_year_id BigInt
+  enrolled_at      DateTime         @db.Date
+  left_at          DateTime?        @db.Date
+  status           EnrollmentStatus @default(active)
+  academic_year    academic_years   @relation(fields: [academic_year_id], references: [id], onDelete: Cascade)
+  school           schools          @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  section          sections         @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  student          students         @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([student_id, section_id, academic_year_id])
+  @@index([school_id])
+  @@index([status])
+  @@index([enrolled_at])
+  @@index([left_at])
+}
+
+model parents_guardians {
+  id                     BigInt                   @id @default(autoincrement())
+  school_id              BigInt
+  user_id                BigInt?
+  first_name             String                   @db.VarChar(100)
+  last_name              String                   @db.VarChar(100)
+  phone                  String                   @db.VarChar(20)
+  phone_alt              String?                  @db.VarChar(20)
+  email                  String?                  @db.VarChar(255)
+  national_id            String?                  @db.VarChar(30)
+  relationship           String                   @db.VarChar(50)
+  address                String?
+  occupation             String?                  @db.VarChar(100)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(3)
+  updated_at             DateTime                 @default(now()) @updatedAt @db.Timestamptz(3)
+  school                 schools                  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  user                   users?                   @relation(fields: [user_id], references: [id])
+  student_leave_requests student_leave_requests[]
+  student_parent_links   student_parent_links[]
+
+  @@index([school_id])
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model student_parent_links {
+  id         BigInt            @id @default(autoincrement())
+  student_id BigInt
+  parent_id  BigInt
+  is_primary Boolean           @default(false)
+  parent     parents_guardians @relation(fields: [parent_id], references: [id], onDelete: Cascade)
+  student    students          @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([student_id, parent_id])
+}
+
+model biometric_enrollments {
+  id            BigInt        @id @default(autoincrement())
+  school_id     BigInt
+  student_id    BigInt
+  type          BiometricType
+  template_hash String?       @db.VarChar(500)
+  card_uid      String?       @db.VarChar(100)
+  enrolled_by   BigInt?
+  enrolled_at   DateTime      @default(now()) @db.Timestamptz(3)
+  is_active     Boolean       @default(true)
+  school        schools       @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student       students      @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([student_id])
+  @@index([card_uid])
+  @@index([enrolled_at])
+}
+
+model staff_profiles {
+  id                     BigInt                 @id @default(autoincrement())
+  school_id              BigInt
+  user_id                BigInt?
+  staff_id_number        String?                @db.VarChar(30)
+  gender                 Gender?
+  department             String?                @db.VarChar(100)
+  contract_type          StaffContractType?
+  join_date              DateTime?              @db.Date
+  employment_status      EmploymentStatus       @default(active)
+  subjects               Json?
+  created_at             DateTime               @default(now()) @db.Timestamptz(3)
+  updated_at             DateTime               @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at             DateTime?              @db.Timestamptz(3)
+  date_of_birth          DateTime?              @db.Date
+  national_id            String?                @db.VarChar(30)
+  address                String?
+  emergency_contact      String?                @db.VarChar(100)
+  qualifications         String?                @db.VarChar(255)
+  experience             String?                @db.VarChar(100)
+  timetable_access       String?                @db.VarChar(50)
+  basic_salary           Decimal?               @db.Decimal(12, 2)
+  boarding_roll_calls    boarding_roll_calls[]
+  supervised_dormitories dormitories[]
+  dormitory_assignments dormitory_supervisor_assignments[]
+  payslips               payslips[]
+  salary_records         salary_records[]
+  staff_leave_balances   staff_leave_balances[]
+  school                 schools                @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  user                   users?                 @relation(fields: [user_id], references: [id])
+
+  @@unique([school_id, staff_id_number])
+  @@index([school_id])
+  @@index([employment_status])
+  @@index([department])
+  @@index([join_date])
+  @@index([created_at])
+  @@index([updated_at])
+  @@index([deleted_at])
+}
+
+model staff_leave_balances {
+  id               BigInt         @id @default(autoincrement())
+  school_id        BigInt
+  staff_id         BigInt
+  academic_year_id BigInt
+  annual_days      Int            @default(21) @db.SmallInt
+  sick_days        Int            @default(10) @db.SmallInt
+  emergency_days   Int            @default(3) @db.SmallInt
+  annual_used      Int            @default(0) @db.SmallInt
+  sick_used        Int            @default(0) @db.SmallInt
+  emergency_used   Int            @default(0) @db.SmallInt
+  academic_year    academic_years @relation(fields: [academic_year_id], references: [id], onDelete: Cascade)
+  school           schools        @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  staff            staff_profiles @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+
+  @@unique([staff_id, academic_year_id])
+  @@index([school_id])
+}
+
+model salary_records {
+  id             BigInt         @id @default(autoincrement())
+  school_id      BigInt
+  staff_id       BigInt
+  month          Int            @db.SmallInt
+  year           Int            @db.SmallInt
+  basic_salary   Decimal        @db.Decimal(12, 2)
+  allowances     Decimal        @default(0) @db.Decimal(12, 2)
+  deductions     Decimal        @default(0) @db.Decimal(12, 2)
+  net_salary     Decimal        @db.Decimal(12, 2)
+  status         SalaryStatus   @default(pending)
+  paid_at        DateTime?      @db.Timestamptz(3)
+  payment_method String?        @db.VarChar(50)
+  notes          String?
+  created_at     DateTime       @default(now()) @db.Timestamptz(3)
+  school         schools        @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  staff          staff_profiles @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+
+  @@unique([staff_id, month, year])
+  @@index([school_id])
+  @@index([status])
+  @@index([paid_at])
+  @@index([created_at])
+}
+
+model attendance_sessions {
+  id                 BigInt                @id @default(autoincrement())
+  school_id          BigInt
+  section_id         BigInt
+  subject_id         BigInt?
+  teacher_id         BigInt?
+  period_id          BigInt?
+  session_date       DateTime              @db.Date
+  session_type       AttendanceSessionType @default(class)
+  started_at         DateTime?             @db.Timestamptz(3)
+  submitted_at       DateTime?             @db.Timestamptz(3)
+  notes              String?
+  created_at         DateTime              @default(now()) @db.Timestamptz(3)
+  attendance_records attendance_records[]
+  period             timetable_periods?    @relation(fields: [period_id], references: [id])
+  school             schools               @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  section            sections              @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  subject            subjects?             @relation(fields: [subject_id], references: [id], onDelete: SetNull)
+  teacher            users?                @relation(fields: [teacher_id], references: [id])
+
+  @@index([school_id, session_date])
+  @@index([section_id])
+  @@index([started_at])
+  @@index([submitted_at])
+  @@index([created_at])
+}
+
+model attendance_records {
+  id             BigInt              @id @default(autoincrement())
+  school_id      BigInt
+  session_id     BigInt
+  student_id     BigInt
+  status         AttendanceStatus    @default(absent)
+  scan_method    ScanMethod          @default(manual)
+  scanned_at     DateTime?           @db.Timestamptz(3)
+  notes          String?             @db.VarChar(255)
+  marked_by      BigInt?
+  created_at     DateTime            @default(now()) @db.Timestamptz(3)
+  updated_at     DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+  marked_by_user users?              @relation(fields: [marked_by], references: [id])
+  school         schools             @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  session        attendance_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  student        students            @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([session_id, student_id])
+  @@index([student_id])
+  @@index([session_id])
+  @@index([status])
+  @@index([school_id, scanned_at])
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model attendance_logs {
+  id                    BigInt    @id @default(autoincrement())
+  school_id             BigInt
+  log_id                String?   @db.Text
+  user_id               String?   @db.Text
+  student_id            String?   @db.Text
+  student_device_id     String?   @db.Text
+  student_name          String?   @db.Text
+  class_name            String?   @db.Text
+  section               String?   @db.Text
+  device_id             String?   @db.Text
+  authentication_method String?   @db.Text
+  direction             String?   @db.Text
+  timestamp             DateTime  @db.Timestamptz(3)
+  status                String?   @db.Text
+  attendance_period     String?   @db.Text
+  raw_data              Json?
+  sync_state            String    @default("synced") @db.VarChar(20)
+  is_flagged            Boolean   @default(false)
+  flag_reason           String?   @db.VarChar(255)
+  synced_at             DateTime? @db.Timestamptz(3)
+  created_at            DateTime  @default(now()) @db.Timestamptz(3)
+  school                schools   @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@unique([log_id, device_id])
+  @@index([school_id, timestamp])
+  @@index([student_device_id])
+  @@index([class_name, section])
+  @@index([device_id])
+  @@index([created_at])
+}
+
+model gate_logs {
+  id                BigInt            @id @default(autoincrement())
+  school_id         BigInt
+  student_id        BigInt?
+  visitor_id        BigInt?
+  user_id           BigInt?
+  event_type        GateEventType
+  scan_method       ScanMethod        @default(manual)
+  scanned_at        DateTime          @default(now()) @db.Timestamptz(3)
+  device_id         String?           @db.VarChar(50)
+  is_flagged        Boolean           @default(false)
+  flag_reason       String?           @db.VarChar(255)
+  synced_at         DateTime?         @db.Timestamptz(3)
+  created_at        DateTime          @default(now()) @db.Timestamptz(3)
+  attendance_status AttendanceStatus?
+  session_name      String?           @db.VarChar(100)
+  status_label      String?           @db.VarChar(100)
+  school            schools           @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student           students?         @relation(fields: [student_id], references: [id])
+
+  @@index([school_id, scanned_at])
+  @@index([student_id])
+  @@index([is_flagged])
+  @@index([synced_at])
+  @@index([session_name])
+  @@index([attendance_status])
+  @@index([created_at])
+}
+
+model offline_sync_queue {
+  id            BigInt            @id @default(autoincrement())
+  school_id     BigInt
+  device_id     String            @db.VarChar(50)
+  record_type   OfflineRecordType
+  payload       Json
+  local_id      String            @db.VarChar(100)
+  status        OfflineSyncStatus @default(pending)
+  retry_count   Int               @default(0) @db.SmallInt
+  synced_at     DateTime?         @db.Timestamptz(3)
+  error_message String?
+  created_at    DateTime          @default(now()) @db.Timestamptz(3)
+  school        schools           @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@unique([device_id, local_id])
+  @@index([status])
+  @@index([school_id])
+  @@index([synced_at])
+  @@index([created_at])
+}
+
+model dormitories {
+  id                           BigInt                         @id @default(autoincrement())
+  school_id                    BigInt
+  name                         String                         @db.VarChar(100)
+  gender                       DormGender                     @default(male)
+  capacity                     Int                            @default(60) @db.SmallInt
+  supervisor_id                BigInt?
+  description                  String?
+  hostel_name                  String?                        @db.VarChar(100)
+  block_name                   String?                        @db.VarChar(100)
+  building                     String?                        @db.VarChar(100)
+  floor                        Int                            @default(0) @db.SmallInt
+  is_active                    Boolean                        @default(true)
+  created_at                   DateTime                       @default(now()) @db.Timestamptz(3)
+  boarding_attendance_records  boarding_attendance_records[]
+  boarding_attendance_sessions boarding_attendance_sessions[]
+  boarding_attendance_windows  boarding_attendance_windows[]
+  boarding_roll_calls          boarding_roll_calls[]
+  absence_alerts               absence_alerts[]
+  devices                      devices[]
+  dining_schedules             dining_schedules[]
+  dining_sessions              dining_sessions[]
+  dorm_rooms                   dorm_rooms[]
+  dormitory_supervisor_assignments dormitory_supervisor_assignments[]
+  patron_dormitory_assignments patron_dormitory_assignments[]
+  school                       schools                        @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  supervisor                   staff_profiles?                @relation(fields: [supervisor_id], references: [id])
+  student_dorm_assignments     student_dorm_assignments[]
+
+  @@index([school_id])
+  @@index([is_active])
+  @@index([created_at])
+}
+
+/// A Patron or Matron can supervise more than one dormitory.  This explicit
+/// assignment replaces the old single `supervisor_id` relationship while
+/// keeping it intact for backwards compatibility with existing schools.
+model dormitory_supervisor_assignments {
+  id               BigInt         @id @default(autoincrement())
+  school_id        BigInt
+  dormitory_id     BigInt
+  staff_profile_id BigInt
+  assigned_by      BigInt?
+  assigned_at      DateTime       @default(now()) @db.Timestamptz(3)
+  removed_at       DateTime?      @db.Timestamptz(3)
+  dormitory        dormitories    @relation(fields: [dormitory_id], references: [id], onDelete: Cascade)
+  school           schools        @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  staff_profile    staff_profiles @relation(fields: [staff_profile_id], references: [id], onDelete: Cascade)
+
+  @@unique([dormitory_id, staff_profile_id])
+  @@index([school_id])
+  @@index([staff_profile_id])
+  @@index([removed_at])
+}
+
+model dorm_rooms {
+  id                       BigInt                     @id @default(autoincrement())
+  school_id                BigInt
+  dormitory_id             BigInt
+  room_number              String                     @db.VarChar(20)
+  capacity                 Int                        @default(6) @db.SmallInt
+  bed_count                Int                        @default(0) @db.SmallInt
+  floor                    Int                        @default(0) @db.SmallInt
+  is_active                Boolean                    @default(true)
+  created_at               DateTime                   @default(now()) @db.Timestamptz(3)
+  dining_schedules         dining_schedules[]
+  dormitory                dormitories                @relation(fields: [dormitory_id], references: [id], onDelete: Cascade)
+  school                   schools                    @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student_dorm_assignments student_dorm_assignments[]
+
+  @@unique([dormitory_id, room_number])
+  @@index([school_id])
+  @@index([is_active])
+  @@index([created_at])
+}
+
+model student_dorm_assignments {
+  id               BigInt         @id @default(autoincrement())
+  school_id        BigInt
+  student_id       BigInt
+  dormitory_id     BigInt
+  room_id          BigInt?
+  bed_number       String?        @db.VarChar(10)
+  academic_year_id BigInt
+  assigned_at      DateTime       @db.Date
+  left_at          DateTime?      @db.Date
+  academic_year    academic_years @relation(fields: [academic_year_id], references: [id], onDelete: Cascade)
+  dormitory        dormitories    @relation(fields: [dormitory_id], references: [id], onDelete: Cascade)
+  room             dorm_rooms?    @relation(fields: [room_id], references: [id])
+  school           schools        @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student          students       @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([student_id, academic_year_id])
+  @@index([school_id])
+  @@index([assigned_at])
+  @@index([left_at])
+}
+
+model boarding_roll_calls {
+  id                         BigInt                       @id @default(autoincrement())
+  school_id                  BigInt
+  dormitory_id               BigInt
+  roll_date                  DateTime                     @db.Date
+  session_type               BoardingSessionType
+  conducted_by               BigInt?
+  submitted_at               DateTime?                    @db.Timestamptz(3)
+  notes                      String?
+  created_at                 DateTime                     @default(now()) @db.Timestamptz(3)
+  boarding_roll_call_records boarding_roll_call_records[]
+  conducted_by_staff         staff_profiles?              @relation(fields: [conducted_by], references: [id])
+  dormitory                  dormitories                  @relation(fields: [dormitory_id], references: [id], onDelete: Cascade)
+  school                     schools                      @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@unique([dormitory_id, roll_date, session_type])
+  @@index([school_id])
+  @@index([roll_date])
+  @@index([submitted_at])
+  @@index([created_at])
+}
+
+model boarding_roll_call_records {
+  id           BigInt              @id @default(autoincrement())
+  school_id    BigInt
+  roll_call_id BigInt
+  student_id   BigInt
+  status       BoardingRollStatus  @default(present)
+  notes        String?             @db.VarChar(255)
+  created_at   DateTime            @default(now()) @db.Timestamptz(3)
+  roll_call    boarding_roll_calls @relation(fields: [roll_call_id], references: [id], onDelete: Cascade)
+  student      students            @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([roll_call_id, student_id])
+  @@index([school_id])
+  @@index([created_at])
+}
+
+model student_leave_requests {
+  id                    BigInt             @id @default(autoincrement())
+  school_id             BigInt
+  student_id            BigInt
+  requested_by          BigInt?
+  parent_id             BigInt?
+  leave_type            StudentLeaveType   @default(weekend)
+  leave_state           LeaveState         @default(requested)
+  leave_category        LeaveCategory      @default(short_leave)
+  start_date            DateTime           @db.Date
+  start_time            DateTime?          @db.Time
+  end_date              DateTime           @db.Date
+  expected_return_time  DateTime?          @db.Time
+  expected_return_at    DateTime?          @db.Timestamptz(3)
+  destination           String?            @db.VarChar(255)
+  reason                String?
+  parent_contact        String?
+  clarification_note    String?
+  source                StudentLeaveRequestSource?
+  medical_notes         String?
+  supporting_doc_url    String?            @db.VarChar(500)
+  requested_by_role     String?            @db.VarChar(50)
+  status                StudentLeaveStatus @default(pending)
+  approved_by           BigInt?
+  approved_at           DateTime?          @db.Timestamptz(3)
+  rejection_reason      String?
+  exited_at             DateTime?          @db.Timestamptz(3)
+  returned_at           DateTime?          @db.Timestamptz(3)
+  gate_keeper_id        BigInt?
+  late_return_flagged   Boolean            @default(false)
+  actual_duration_mins  Int?
+  approved_duration_mins Int?
+  parent_notified_at    DateTime?          @db.Timestamptz(3)
+  patron_notified_at    DateTime?          @db.Timestamptz(3)
+  dod_notified_at       DateTime?          @db.Timestamptz(3)
+  is_unauthorized       Boolean            @default(false)
+  created_by            BigInt?
+  created_at            DateTime           @default(now()) @db.Timestamptz(3)
+  updated_at            DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
+  approved_by_user      users?             @relation("leave_approved_by", fields: [approved_by], references: [id])
+  created_by_user       users?             @relation("leave_created_by", fields: [created_by], references: [id])
+  gate_keeper           users?             @relation("leave_gate_keeper", fields: [gate_keeper_id], references: [id])
+  gate_exit_records     gate_exit_records[]
+  parent                parents_guardians? @relation(fields: [parent_id], references: [id])
+  school                schools            @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student               students           @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([leave_state])
+  @@index([leave_category])
+  @@index([student_id])
+  @@index([school_id])
+  @@index([start_date])
+  @@index([end_date])
+  @@index([approved_at])
+  @@index([exited_at])
+  @@index([returned_at])
+  @@index([gate_keeper_id])
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model absence_alerts {
+  id                   BigInt           @id @default(autoincrement())
+  school_id            BigInt
+  student_id           BigInt
+  dormitory_id         BigInt?
+  boarding_session_id  BigInt?
+  alert_type           AbsenceAlertType
+  severity             AlertSeverity    @default(medium)
+  status               AlertStatus      @default(active)
+  description          String?
+  resolved_by          BigInt?
+  resolved_at          DateTime?        @db.Timestamptz(3)
+  resolution_note      String?
+  escalation_sent_at   DateTime?        @db.Timestamptz(3)
+  parent_sms_sent_at   DateTime?        @db.Timestamptz(3)
+  patron_notified_at   DateTime?        @db.Timestamptz(3)
+  dod_notified_at      DateTime?        @db.Timestamptz(3)
+  created_at           DateTime         @default(now()) @db.Timestamptz(3)
+  dormitory            dormitories?     @relation(fields: [dormitory_id], references: [id])
+  resolved_by_user     users?           @relation(fields: [resolved_by], references: [id])
+  school               schools          @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student              students         @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([student_id])
+  @@index([school_id])
+  @@index([dormitory_id])
+  @@index([resolved_at])
+  @@index([created_at])
+}
+
+model parent_app_otps {
+  id         BigInt    @id @default(autoincrement())
+  parent_id  BigInt
+  school_id  BigInt
+  phone      String    @db.VarChar(20)
+  otp        String    @db.VarChar(6)
+  expires_at DateTime  @db.Timestamptz(3)
+  used_at    DateTime? @db.Timestamptz(3)
+  created_at DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([phone])
+  @@index([parent_id])
+  @@index([expires_at])
+}
+
+model parent_app_sessions {
+  id         BigInt    @id @default(autoincrement())
+  parent_id  BigInt
+  school_id  BigInt
+  phone      String    @db.VarChar(20)
+  token_hash String    @unique @db.VarChar(255)
+  ip_address String?   @db.VarChar(45)
+  user_agent String?   @db.VarChar(500)
+  expires_at DateTime  @db.Timestamptz(3)
+  revoked_at DateTime? @db.Timestamptz(3)
+  created_at DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([parent_id])
+  @@index([token_hash])
+  @@index([expires_at])
+  @@index([revoked_at])
+}
+
+model parent_app_notifications {
+  id         BigInt   @id @default(autoincrement())
+  parent_id  BigInt
+  school_id  BigInt
+  student_id BigInt?
+  title      String   @db.VarChar(255)
+  body       String
+  type       String   @db.VarChar(50)
+  is_read    Boolean  @default(false)
+  metadata   Json?
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([parent_id])
+  @@index([school_id])
+  @@index([is_read])
+  @@index([created_at])
+}
+
+model visitors {
+  id                   BigInt                 @id @default(autoincrement())
+  school_id            BigInt
+  full_name            String                 @db.VarChar(255)
+  phone                String?                @db.VarChar(20)
+  email                String?                @db.VarChar(255)
+  national_id          String?                @db.VarChar(30)
+  organization         String?                @db.VarChar(255)
+  visitor_type         VisitorType            @default(organization)
+  created_at           DateTime               @default(now()) @db.Timestamptz(3)
+  visitor_appointments visitor_appointments[]
+  visitor_visits       visitor_visits[]
+  school               schools                @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([created_at])
+}
+
+model visitor_appointments {
+  id                    BigInt                   @id @default(autoincrement())
+  school_id             BigInt
+  visitor_id            BigInt
+  student_id            BigInt?
+  host_id               BigInt?
+  purpose               VisitorPurpose           @default(other)
+  appointment_at        DateTime?                @db.Timestamptz(3)
+  expected_duration_min Int?                     @db.SmallInt
+  notes                 String?
+  status                VisitorAppointmentStatus @default(pending)
+  created_at            DateTime                 @default(now()) @db.Timestamptz(3)
+  host                  users?                   @relation(fields: [host_id], references: [id])
+  school                schools                  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student               students?                @relation(fields: [student_id], references: [id])
+  visitor               visitors                 @relation(fields: [visitor_id], references: [id], onDelete: Cascade)
+  visitor_visits        visitor_visits[]
+
+  @@index([student_id])
+  @@index([status])
+  @@index([school_id])
+  @@index([appointment_at])
+  @@index([created_at])
+}
+
+model visitor_visits {
+  id              BigInt                @id @default(autoincrement())
+  school_id       BigInt
+  visitor_id      BigInt
+  appointment_id  BigInt?
+  student_id      BigInt?
+  host_id         BigInt?
+  checked_in_by   BigInt?
+  checked_out_by  BigInt?
+  purpose         String?               @db.VarChar(100)
+  checked_in_at   DateTime              @default(now()) @db.Timestamptz(3)
+  expected_out_at DateTime?             @db.Timestamptz(3)
+  checked_out_at  DateTime?             @db.Timestamptz(3)
+  notes           String?
+  badge_printed   Boolean               @default(false)
+  sms_sent_host   Boolean               @default(false)
+  appointment     visitor_appointments? @relation(fields: [appointment_id], references: [id])
+  host            users?                @relation(fields: [host_id], references: [id])
+  school          schools               @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student         students?             @relation(fields: [student_id], references: [id])
+  visitor         visitors              @relation(fields: [visitor_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id, checked_in_at])
+  @@index([visitor_id])
+  @@index([student_id])
+  @@index([expected_out_at])
+  @@index([checked_out_at])
+}
+
+model fee_structures {
+  id                      BigInt                    @id @default(autoincrement())
+  school_id               BigInt
+  academic_year_id        BigInt
+  term_id                 BigInt?
+  class_id                BigInt?
+  name                    String                    @db.VarChar(100)
+  amount                  Decimal                   @db.Decimal(12, 2)
+  currency                String                    @default("RWF") @db.Char(3)
+  is_mandatory            Boolean                   @default(true)
+  is_active               Boolean                   @default(true)
+  due_date                DateTime?                 @db.Date
+  created_at              DateTime                  @default(now()) @db.Timestamptz(3)
+  updated_at              DateTime                  @default(now()) @updatedAt @db.Timestamptz(3)
+  academic_year           academic_years            @relation(fields: [academic_year_id], references: [id], onDelete: Cascade)
+  class                   classes?                  @relation(fields: [class_id], references: [id])
+  school                  schools                   @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  term                    terms?                    @relation(fields: [term_id], references: [id])
+  student_fee_assignments student_fee_assignments[]
+  student_invoice_items   student_invoice_items[]
+
+  @@index([school_id])
+  @@index([due_date])
+  @@index([created_at])
+  @@index([updated_at])
+  @@index([is_active])
+}
+
+model student_fee_assignments {
+  id               BigInt              @id @default(autoincrement())
+  school_id        BigInt
+  student_id       BigInt
+  fee_structure_id BigInt
+  amount_due       Decimal             @db.Decimal(12, 2)
+  amount_paid      Decimal             @default(0) @db.Decimal(12, 2)
+  balance          Decimal             @default(0) @db.Decimal(12, 2)
+  status           FeeAssignmentStatus @default(unpaid)
+  due_date         DateTime?           @db.Date
+  waiver_reason    String?
+  created_at       DateTime            @default(now()) @db.Timestamptz(3)
+  updated_at       DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+  fee_transactions fee_transactions[]
+  fee_structure    fee_structures      @relation(fields: [fee_structure_id], references: [id], onDelete: Cascade)
+  school           schools             @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student          students            @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@index([student_id])
+  @@index([status])
+  @@index([school_id])
+  @@index([due_date])
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model fee_transactions {
+  id                BigInt                   @id @default(autoincrement())
+  school_id         BigInt
+  student_id        BigInt
+  fee_assignment_id BigInt?
+  receipt_number    String                   @unique @db.VarChar(30)
+  amount            Decimal                  @db.Decimal(12, 2)
+  currency          String                   @default("RWF") @db.Char(3)
+  payment_method    PaymentMethod            @default(cash)
+  payment_ref       String?                  @db.VarChar(100)
+  paid_at           DateTime                 @default(now()) @db.Timestamptz(3)
+  received_by       BigInt?
+  notes             String?
+  receipt_url       String?                  @db.VarChar(500)
+  created_at        DateTime                 @default(now()) @db.Timestamptz(3)
+  fee_assignment    student_fee_assignments? @relation(fields: [fee_assignment_id], references: [id])
+  received_by_user  users?                   @relation(fields: [received_by], references: [id])
+  school            schools                  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student           students                 @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@index([student_id])
+  @@index([paid_at])
+  @@index([school_id])
+  @@index([created_at])
+}
+
+model exams {
+  id           BigInt         @id @default(autoincrement())
+  school_id    BigInt
+  section_id   BigInt?
+  subject_id   BigInt
+  teacher_id   BigInt?
+  term_id      BigInt?
+  exam_type_id BigInt?
+  name         String         @db.VarChar(255)
+  type         ExamType       @default(cat)
+  exam_date    DateTime?      @db.Date
+  start_time   DateTime?      @db.Time(6)
+  duration_min Int?           @db.SmallInt
+  max_marks    Decimal        @default(100) @db.Decimal(6, 2)
+  pass_mark    Decimal        @default(50) @db.Decimal(6, 2)
+  status       ExamStatus     @default(scheduled)
+  published_by BigInt?
+  published_at DateTime?      @db.Timestamptz(3)
+  created_at   DateTime       @default(now()) @db.Timestamptz(3)
+  updated_at   DateTime       @default(now()) @updatedAt @db.Timestamptz(3)
+  exam_results exam_results[]
+  school       schools        @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  section      sections?      @relation(fields: [section_id], references: [id])
+  subject      subjects       @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+  teacher      users?         @relation(fields: [teacher_id], references: [id])
+  exam_type    exam_types?    @relation(fields: [exam_type_id], references: [id], onDelete: SetNull)
+  publisher    users?         @relation("exam_publisher", fields: [published_by], references: [id])
+
+  @@index([school_id])
+  @@index([status])
+  @@index([exam_date])
+  @@index([published_at])
+  @@index([created_at])
+  @@index([updated_at])
+  @@index([exam_type_id])
+}
+
+model exam_types {
+  id          BigInt   @id @default(autoincrement())
+  school_id   BigInt
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(3)
+  updated_at  DateTime @updatedAt @db.Timestamptz(3)
+  school      schools  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  exams       exams[]
+
+  @@unique([school_id, name])
+  @@index([school_id])
+  @@index([is_active])
+}
+
+model exam_modification_requests {
+  id          BigInt   @id @default(autoincrement())
+  school_id   BigInt
+  exam_id     BigInt
+  teacher_id  BigInt
+  reason      String   @db.VarChar(1000)
+  status      ExamModificationRequestStatus @default(pending)
+  reviewed_by BigInt?
+  reviewed_at DateTime? @db.Timestamptz(3)
+  created_at  DateTime @default(now()) @db.Timestamptz(3)
+  updated_at  DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([school_id, status])
+  @@index([exam_id])
+}
+
+model grading_roles {
+  id              BigInt   @id @default(autoincrement())
+  school_id       BigInt
+  code            String   @db.VarChar(20)
+  label           String   @db.VarChar(100)
+  min_percentage  Decimal  @db.Decimal(5, 2)
+  max_percentage  Decimal  @db.Decimal(5, 2)
+  is_active       Boolean  @default(true)
+  sort_order      Int      @default(0)
+  created_at      DateTime @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime @updatedAt @db.Timestamptz(3)
+  school          schools  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@unique([school_id, code])
+  @@index([school_id])
+  @@index([is_active])
+  @@index([min_percentage])
+}
+
+model exam_results {
+  id             BigInt    @id @default(autoincrement())
+  school_id      BigInt
+  exam_id        BigInt
+  student_id     BigInt
+  marks_obtained Decimal?  @db.Decimal(6, 2)
+  grade          String?   @db.VarChar(5)
+  grade_label    String?   @db.VarChar(30)
+  is_absent      Boolean   @default(false)
+  remarks        String?   @db.VarChar(255)
+  entered_by     BigInt?
+  entered_at     DateTime? @db.Timestamptz(3)
+  published_at   DateTime? @db.Timestamptz(3)
+  created_at     DateTime  @default(now()) @db.Timestamptz(3)
+  updated_at     DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+  exam           exams     @relation(fields: [exam_id], references: [id], onDelete: Cascade)
+  school         schools   @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student        students  @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([exam_id, student_id])
+  @@index([student_id])
+  @@index([exam_id])
+  @@index([school_id])
+  @@index([entered_at])
+  @@index([published_at])
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model report_cards {
+  id          BigInt    @id @default(autoincrement())
+  school_id   BigInt
+  student_id  BigInt
+  term_id     BigInt
+  title       String    @db.VarChar(255)
+  prepared_by BigInt?
+  issued_on   DateTime  @db.Date
+  created_at  DateTime  @default(now()) @db.Timestamptz(3)
+  updated_at  DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at  DateTime? @db.Timestamptz(3)
+  school      schools   @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student     students  @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  term        terms     @relation(fields: [term_id], references: [id], onDelete: Cascade)
+  preparer    users?    @relation("report_card_preparer", fields: [prepared_by], references: [id])
+
+  @@unique([student_id, term_id])
+  @@index([school_id])
+  @@index([term_id])
+  @@index([issued_on])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model sms_providers {
+  id                BigInt              @id @default(autoincrement())
+  name              String              @db.VarChar(50)
+  slug              String              @unique @db.VarChar(30)
+  api_key_masked    String?             @db.VarChar(100)
+  sender_id         String?             @db.VarChar(20)
+  is_default        Boolean             @default(false)
+  is_active         Boolean             @default(true)
+  priority          Int                 @default(1) @db.SmallInt
+  unit_cost         Decimal             @default(0) @db.Decimal(12, 4)
+  currency          String              @default("RWF") @db.Char(3)
+  config            Json?
+  created_at        DateTime            @default(now()) @db.Timestamptz(3)
+  updated_at        DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+  notification_logs notification_logs[]
+
+  @@index([is_active])
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model notification_templates {
+  id                BigInt              @id @default(autoincrement())
+  school_id         BigInt?
+  name              String              @db.VarChar(100)
+  slug              String              @db.VarChar(100)
+  trigger_type      String              @db.VarChar(50)
+  body_en           String
+  body_kin          String?
+  variables         Json?
+  is_active         Boolean             @default(true)
+  created_at        DateTime            @default(now()) @db.Timestamptz(3)
+  updated_at        DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+  notification_logs notification_logs[]
+  attendance_sms_mappings attendance_sms_mappings[]
+  school            schools?            @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  device_sessions   device_sessions[]
+
+  @@unique([school_id, slug])
+  @@index([school_id])
+  @@index([is_active])
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model attendance_sms_mappings {
+  id          BigInt   @id @default(autoincrement())
+  school_id   BigInt
+  source_type String   @db.VarChar(50)
+  event_type  String   @db.VarChar(50)
+  scope_key   String   @default("global") @db.VarChar(100)
+  template_id BigInt?
+  send_sms    Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(3)
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  school      schools  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  template    notification_templates? @relation(fields: [template_id], references: [id], onDelete: SetNull)
+
+  @@unique([school_id, source_type, event_type, scope_key])
+  @@index([school_id])
+  @@index([source_type, event_type])
+  @@index([template_id])
+}
+
+model notification_logs {
+  id             BigInt                    @id @default(autoincrement())
+  school_id      BigInt
+  template_id    BigInt?
+  recipient_type NotificationRecipientType
+  recipient_id   BigInt?
+  phone          String?                   @db.VarChar(20)
+  email          String?                   @db.VarChar(255)
+  channel        NotificationChannel       @default(sms)
+  trigger_type   String?                   @db.VarChar(50)
+  body_en        String?
+  body_kin       String?
+  language_sent  NotificationLanguage?
+  status         NotificationStatus        @default(queued)
+  provider_id    BigInt?
+  provider_ref   String?                   @db.VarChar(100)
+  sms_cost       Decimal                   @default(0) @db.Decimal(12, 4)
+  sms_currency   String                    @default("RWF") @db.Char(3)
+  sent_at        DateTime?                 @db.Timestamptz(3)
+  delivered_at   DateTime?                 @db.Timestamptz(3)
+  retry_count    Int                       @default(0) @db.SmallInt
+  error_message  String?
+  created_at     DateTime                  @default(now()) @db.Timestamptz(3)
+  provider       sms_providers?            @relation(fields: [provider_id], references: [id])
+  school         schools                   @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  template       notification_templates?   @relation(fields: [template_id], references: [id])
+
+  @@index([school_id])
+  @@index([status])
+  @@index([recipient_type, recipient_id])
+  @@index([sent_at])
+  @@index([delivered_at])
+  @@index([created_at])
+}
+
+model audit_logs {
+  id            BigInt         @id @default(autoincrement())
+  school_id     BigInt?
+  actor_type    AuditActorType @default(school_user)
+  actor_id      BigInt?
+  actor_name    String?        @db.VarChar(255)
+  action        String         @db.VarChar(100)
+  resource_type String         @db.VarChar(100)
+  resource_id   BigInt?
+  resource_name String?        @db.VarChar(255)
+  old_values    Json?
+  new_values    Json?
+  ip_address    String?        @db.VarChar(45)
+  user_agent    String?        @db.VarChar(500)
+  severity      AuditSeverity  @default(info)
+  created_at    DateTime       @default(now()) @db.Timestamptz(3)
+
+  @@index([school_id])
+  @@index([actor_type, actor_id])
+  @@index([resource_type, resource_id])
+  @@index([created_at])
+  @@index([severity])
+}
+
+model messages {
+  id         BigInt    @id @default(autoincrement())
+  thread_id  BigInt
+  school_id  BigInt
+  sender_id  BigInt?
+  body       String
+  body_kin   String?
+  is_sms     Boolean   @default(false)
+  read_at    DateTime? @db.Timestamptz(3)
+  created_at DateTime  @default(now()) @db.Timestamptz(3)
+  school     schools   @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([thread_id])
+  @@index([school_id])
+  @@index([read_at])
+  @@index([created_at])
+}
+
+model feature_flags {
+  id          BigInt   @id @default(autoincrement())
+  key_name    String   @unique @db.VarChar(100)
+  label       String   @db.VarChar(100)
+  description String?
+  is_enabled  Boolean  @default(false)
+  is_beta     Boolean  @default(false)
+  updated_by  BigInt?
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([updated_at])
+}
+
+model system_settings {
+  id         BigInt            @id @default(autoincrement())
+  school_id  BigInt?
+  key_name   String            @db.VarChar(100)
+  value      String?
+  type       SystemSettingType @default(string)
+  updated_by BigInt?
+  updated_at DateTime          @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@unique([school_id, key_name])
+  @@index([school_id])
+  @@index([updated_at])
+}
+
+model devices {
+  id                  BigInt            @id @default(autoincrement())
+  school_id           BigInt
+  device_uid          String            @unique @db.VarChar(100)
+  name                String            @db.VarChar(100)
+  type                DeviceType        @default(tablet)
+  location            String?           @db.VarChar(100)
+  mode                DeviceMode        @default(gate)
+  pin_hash            String?           @db.VarChar(255)
+  is_active           Boolean           @default(true)
+  last_seen_at        DateTime?         @db.Timestamptz(3)
+  firmware_version    String?           @db.VarChar(20)
+  created_at          DateTime          @default(now()) @db.Timestamptz(3)
+  updated_at          DateTime          @default(now()) @updatedAt @db.Timestamptz(3)
+  last_sync_status    String?           @db.VarChar(30)
+  last_sync_error     String?
+  last_status_message String?
+  api_url             String?           @db.VarChar(255)
+  tablet_ip           String?           @db.VarChar(50)
+  tablet_port         Int?              @db.SmallInt
+  last_sync_at        DateTime?         @db.Timestamptz(3)
+  attendance_config   Json?
+  connection_error    String?
+  device_logs_count   Int?              @default(0)
+  device_serial       String?           @db.VarChar(100)
+  device_users_count  Int?              @default(0)
+  is_connected        Boolean           @default(false)
+  last_connection_at  DateTime?         @db.Timestamptz(3)
+  license_number      Int?
+  product_code        String?           @db.VarChar(50)
+  product_name        String?           @db.VarChar(100)
+  tablet_id           BigInt?
+  location_scope      DeviceLocationScope @default(gate)
+  dormitory_id        BigInt?
+  location_label      String?           @db.VarChar(100)
+  assigned_by         BigInt?
+  assigned_at         DateTime?         @db.Timestamptz(3)
+  device_sessions     device_sessions[]
+  school              schools           @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  tablet              tablets?          @relation(fields: [tablet_id], references: [id])
+  dormitory           dormitories?      @relation(fields: [dormitory_id], references: [id])
+  assigned_by_user    users?            @relation("device_assigned_by", fields: [assigned_by], references: [id])
+
+  @@index([school_id])
+  @@index([is_active])
+  @@index([last_seen_at])
+  @@index([tablet_id])
+  @@index([dormitory_id])
+  @@index([location_scope])
+  @@index([is_connected])
+  @@index([last_connection_at])
+  @@index([created_at])
+  @@index([updated_at])
+}
+
+model device_sessions {
+  id                       BigInt                  @id @default(autoincrement())
+  device_id                BigInt
+  school_id                BigInt
+  name                     String                  @db.VarChar(100)
+  send_sms                 Boolean                 @default(true)
+  auto_approve             Boolean                 @default(true)
+  is_active                Boolean                 @default(false)
+  activated_at             DateTime?               @db.Timestamptz(3)
+  notification_template_id BigInt?
+  created_at               DateTime                @default(now()) @db.Timestamptz(3)
+  updated_at               DateTime                @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at               DateTime?               @db.Timestamptz(3)
+  attendance_windows       attendance_windows[]
+  device                   devices                 @relation(fields: [device_id], references: [id], onDelete: Cascade)
+  school                   schools                 @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  notification_template    notification_templates? @relation(fields: [notification_template_id], references: [id], onDelete: SetNull)
+
+  @@unique([device_id, name])
+  @@index([school_id])
+  @@index([device_id])
+  @@index([is_active])
+  @@index([created_at])
+  @@index([deleted_at])
+  @@index([notification_template_id])
+}
+
+model attendance_windows {
+  id            BigInt          @id @default(autoincrement())
+  session_id    BigInt
+  label         String          @db.VarChar(100)
+  start_time    String          @db.VarChar(5)
+  end_time      String          @db.VarChar(5)
+  grace_minutes Int             @default(0) @db.SmallInt
+  sort_order    Int             @default(0) @db.SmallInt
+  created_at    DateTime        @default(now()) @db.Timestamptz(3)
+  updated_at    DateTime        @default(now()) @updatedAt @db.Timestamptz(3)
+  session       device_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@index([session_id])
+  @@index([created_at])
+}
+
+model tablets {
+  id                    BigInt       @id @default(autoincrement())
+  school_id             BigInt
+  uuid                  String       @unique @default(uuid()) @db.Uuid
+  name                  String       @db.VarChar(100)
+  ip                    String       @db.VarChar(50)
+  port                  Int          @default(5000) @db.SmallInt
+  url                   String       @db.VarChar(255)
+  status                TabletStatus @default(offline)
+  last_health_check     DateTime?    @db.Timestamptz(3)
+  health_check_interval Int          @default(60) @db.SmallInt
+  firmware_version      String?      @db.VarChar(50)
+  os_info               String?      @db.VarChar(100)
+  location              String?      @db.VarChar(100)
+  is_active             Boolean      @default(true)
+  notes                 String?
+  dev_password          String?      @db.VarChar(100)
+  dev_password_set_at   DateTime?    @db.Timestamptz(3)
+  created_at            DateTime     @default(now()) @db.Timestamptz(3)
+  updated_at            DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at            DateTime?    @db.Timestamptz(3)
+  devices               devices[]
+  school                schools      @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([status])
+  @@index([is_active])
+  @@index([last_health_check])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model expenses {
+  id               BigInt         @id @default(autoincrement())
+  school_id        BigInt
+  reference        String         @db.VarChar(30)
+  expense_date     DateTime       @db.Date
+  category         String         @db.VarChar(100)
+  description      String
+  vendor           String?        @db.VarChar(255)
+  amount           Decimal        @db.Decimal(12, 2)
+  currency         String         @default("RWF") @db.Char(3)
+  document_url     String?        @db.VarChar(500)
+  status           ExpenseStatus  @default(pending)
+  approved_by      BigInt?
+  approved_at      DateTime?      @db.Timestamptz(3)
+  rejection_reason String?
+  paid_at          DateTime?      @db.Timestamptz(3)
+  payment_method   PaymentMethod?
+  created_by       BigInt?
+  created_at       DateTime       @default(now()) @db.Timestamptz(3)
+  updated_at       DateTime       @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at       DateTime?      @db.Timestamptz(3)
+  school           schools        @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  approver         users?         @relation("expense_approver", fields: [approved_by], references: [id])
+  creator          users?         @relation("expense_creator", fields: [created_by], references: [id])
+
+  @@unique([school_id, reference])
+  @@index([school_id])
+  @@index([status])
+  @@index([category])
+  @@index([expense_date])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model expense_categories {
+  id         BigInt   @id @default(autoincrement())
+  school_id  BigInt
+  name       String   @db.VarChar(100)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  school     schools  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@unique([school_id, name])
+  @@index([school_id])
+  @@index([is_active])
+}
+
+model suppliers {
+  id              BigInt            @id @default(autoincrement())
+  school_id       BigInt
+  code            String            @db.VarChar(30)
+  name            String            @db.VarChar(255)
+  country_code    String?           @db.VarChar(2)
+  tin_number      String?           @db.VarChar(50)
+  category        String?           @db.VarChar(100)
+  contact_person  String?           @db.VarChar(255)
+  phone           String?           @db.VarChar(20)
+  email           String?           @db.VarChar(255)
+  address         String?
+  balance         Decimal           @default(0) @db.Decimal(12, 2)
+  is_active       Boolean           @default(true)
+  created_at      DateTime          @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime          @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at      DateTime?         @db.Timestamptz(3)
+  school          schools           @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  inventory_items inventory_items[]
+
+  @@unique([school_id, code])
+  @@index([school_id])
+  @@index([is_active])
+  @@index([category])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model inventory_items {
+  id            BigInt     @id @default(autoincrement())
+  school_id     BigInt
+  code          String     @db.VarChar(30)
+  item_name     String     @db.VarChar(255)
+  category      String?    @db.VarChar(100)
+  supplier_id   BigInt?
+  quantity      Int        @default(0)
+  unit_cost     Decimal    @db.Decimal(12, 2)
+  currency      String     @default("RWF") @db.Char(3)
+  reorder_level Int        @default(0)
+  status        POStatus   @default(requested)
+  invoice_url   String?    @db.VarChar(500)
+  notes         String?
+  amount_paid   Decimal  @default(0) @db.Decimal(12, 2)
+  paid_at       DateTime?
+  payment_method PaymentMethod?
+  created_by    BigInt?
+  created_at    DateTime   @default(now()) @db.Timestamptz(3)
+  updated_at    DateTime   @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at    DateTime?  @db.Timestamptz(3)
+  school        schools    @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  supplier      suppliers? @relation(fields: [supplier_id], references: [id])
+
+  @@unique([school_id, code])
+  @@index([school_id])
+  @@index([status])
+  @@index([category])
+  @@index([supplier_id])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model inventory_categories {
+  id         BigInt   @id @default(autoincrement())
+  school_id  BigInt
+  name       String   @db.VarChar(100)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  school     schools  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@unique([school_id, name])
+  @@index([school_id])
+  @@index([is_active])
+}
+
+model student_invoices {
+  id               BigInt                  @id @default(autoincrement())
+  school_id        BigInt
+  invoice_number   String                  @db.VarChar(30)
+  student_id       BigInt
+  academic_year_id BigInt?
+  term_id          BigInt?
+  issue_date       DateTime                @db.Date
+  due_date         DateTime                @db.Date
+  subtotal         Decimal                 @default(0) @db.Decimal(12, 2)
+  discount         Decimal                 @default(0) @db.Decimal(12, 2)
+  previous_balance Decimal                 @default(0) @db.Decimal(12, 2)
+  late_charges     Decimal                 @default(0) @db.Decimal(12, 2)
+  total            Decimal                 @default(0) @db.Decimal(12, 2)
+  amount_paid      Decimal                 @default(0) @db.Decimal(12, 2)
+  payment_date     DateTime?               @db.Date
+  payment_method   PaymentMethod?
+  currency         String                  @default("RWF") @db.Char(3)
+  status           StudentInvoiceStatus    @default(draft)
+  document_url     String?                 @db.VarChar(500)
+  notes            String?
+  created_by       BigInt?
+  created_at       DateTime                @default(now()) @db.Timestamptz(3)
+  updated_at       DateTime                @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at       DateTime?               @db.Timestamptz(3)
+  school           schools                 @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student          students                @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  academic_year    academic_years?         @relation(fields: [academic_year_id], references: [id])
+  term             terms?                  @relation(fields: [term_id], references: [id])
+  items            student_invoice_items[]
+
+  @@unique([school_id, invoice_number])
+  @@index([school_id])
+  @@index([student_id])
+  @@index([status])
+  @@index([due_date])
+  @@index([issue_date])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model student_invoice_items {
+  id               BigInt           @id @default(autoincrement())
+  invoice_id       BigInt
+  fee_structure_id BigInt?
+  label            String           @db.VarChar(255)
+  amount           Decimal          @db.Decimal(12, 2)
+  created_at       DateTime         @default(now()) @db.Timestamptz(3)
+  invoice          student_invoices @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+  fee_structure    fee_structures?  @relation(fields: [fee_structure_id], references: [id])
+
+  @@index([invoice_id])
+  @@index([fee_structure_id])
+}
+
+model payroll_runs {
+  id               BigInt           @id @default(autoincrement())
+  school_id        BigInt
+  month            Int              @db.SmallInt
+  year             Int              @db.SmallInt
+  status           PayrollRunStatus @default(draft)
+  total_gross      Decimal          @default(0) @db.Decimal(14, 2)
+  total_deductions Decimal          @default(0) @db.Decimal(14, 2)
+  total_net        Decimal          @default(0) @db.Decimal(14, 2)
+  employee_count   Int              @default(0)
+  currency         String           @default("RWF") @db.Char(3)
+  submitted_at     DateTime?        @db.Timestamptz(3)
+  approved_by      BigInt?
+  approved_at      DateTime?        @db.Timestamptz(3)
+  paid_at          DateTime?        @db.Timestamptz(3)
+  notes            String?
+  created_at       DateTime         @default(now()) @db.Timestamptz(3)
+  updated_at       DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at       DateTime?        @db.Timestamptz(3)
+  school           schools          @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  approver         users?           @relation("payroll_run_approver", fields: [approved_by], references: [id])
+  payslips         payslips[]
+
+  @@unique([school_id, month, year])
+  @@index([school_id])
+  @@index([status])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+model payslips {
+  id               BigInt           @id @default(autoincrement())
+  school_id        BigInt
+  payroll_run_id   BigInt
+  staff_id         BigInt
+  reference        String           @db.VarChar(40)
+  basic_salary     Decimal          @default(0) @db.Decimal(12, 2)
+  allowances       Decimal          @default(0) @db.Decimal(12, 2)
+  overtime         Decimal          @default(0) @db.Decimal(12, 2)
+  bonus            Decimal          @default(0) @db.Decimal(12, 2)
+  gross_salary     Decimal          @default(0) @db.Decimal(12, 2)
+  tax              Decimal          @default(0) @db.Decimal(12, 2)
+  pension          Decimal          @default(0) @db.Decimal(12, 2)
+  loan_recovery    Decimal          @default(0) @db.Decimal(12, 2)
+  other_deductions Decimal          @default(0) @db.Decimal(12, 2)
+  total_deductions Decimal          @default(0) @db.Decimal(12, 2)
+  net_salary       Decimal          @default(0) @db.Decimal(12, 2)
+  currency         String           @default("RWF") @db.Char(3)
+  status           PayrollRunStatus @default(draft)
+  paid_at          DateTime?        @db.Timestamptz(3)
+  payment_method   PaymentMethod?
+  notes            String?
+  created_at       DateTime         @default(now()) @db.Timestamptz(3)
+  updated_at       DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at       DateTime?        @db.Timestamptz(3)
+  school           schools          @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  payroll_run      payroll_runs     @relation(fields: [payroll_run_id], references: [id], onDelete: Cascade)
+  staff            staff_profiles   @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+
+  @@unique([payroll_run_id, staff_id])
+  @@unique([school_id, reference])
+  @@index([school_id])
+  @@index([payroll_run_id])
+  @@index([staff_id])
+  @@index([status])
+  @@index([created_at])
+  @@index([deleted_at])
+}
+
+enum ExpenseStatus {
+  pending
+  approved
+  paid
+  rejected
+}
+
+enum POStatus {
+  requested
+  ordered
+  received
+  invoiced
+  cancelled
+}
+
+enum StudentInvoiceStatus {
+  draft
+  pending
+  partially_paid
+  paid
+  cancelled
+  refunded
+}
+
+enum PayrollRunStatus {
+  draft
+  submitted
+  approved
+  paid
+}
+
+enum SchoolType {
+  government
+  private
+  international
+  technical
+  seminary
+  other
+}
+
+enum SchoolStatus {
+  active
+  trial
+  grace
+  suspended
+  expired
+  cancelled
+}
+
+enum BillingCycle {
+  monthly
+  annual
+  term
+  weekly
+  daily
+}
+
+enum SchoolSubscriptionStatus {
+  active
+  trial
+  grace
+  expired
+  cancelled
+  pending
+}
+
+enum InvoiceStatus {
+  draft
+  issued
+  paid
+  overdue
+  void
+  refunded
+}
+
+enum PlatformUserRole {
+  platform_admin
+  support
+}
+
+enum PlatformUserAccessScope {
+  all
+  assigned
+}
+
+enum PlatformUserStatus {
+  active
+  inactive
+  locked
+}
+
+enum AnnouncementType {
+  info
+  warning
+  critical
+  maintenance
+  feature
+}
+
+enum AnnouncementTargetScope {
+  all
+  plan
+  province
+  specific
+}
+
+enum AnnouncementStatus {
+  draft
+  scheduled
+  sent
+}
+
+enum SupportTicketCategory {
+  technical
+  billing
+  feature_request
+  other
+}
+
+enum SupportTicketPriority {
+  low
+  medium
+  high
+  critical
+}
+
+enum SupportTicketStatus {
+  open
+  in_progress
+  resolved
+  closed
+}
+
+enum SupportTicketSenderType {
+  school_user
+  platform_user
+}
+
+enum SupportTicketAudience {
+  school_admin
+  platform_admin
+}
+
+enum UserRole {
+  school_admin
+  teacher
+  staff
+  parent
+  student
+  gate_keeper
+  boarding_officer
+  director_of_discipline
+  director_of_studies
+  patron
+  matron
+  finance_officer
+}
+
+enum UserStatus {
+  active
+  inactive
+  locked
+  pending
+}
+
+enum HolidayType {
+  national
+  school
+  exam
+  other
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum StudentType {
+  boarding
+  day
+}
+
+enum StudentStatus {
+  active
+  inactive
+  transferred
+  graduated
+  expelled
+}
+
+enum EnrollmentStatus {
+  active
+  transferred
+  dropped
+}
+
+enum BiometricType {
+  face
+  fingerprint
+  card_nfc
+  card_qr
+}
+
+enum StaffContractType {
+  permanent
+  contract
+  part_time
+}
+
+enum EmploymentStatus {
+  active
+  on_leave
+  inactive
+}
+
+enum SalaryStatus {
+  pending
+  paid
+  cancelled
+}
+
+enum AttendanceSessionType {
+  class
+  gate
+  boarding_morning
+  boarding_evening
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  excused
+}
+
+enum ScanMethod {
+  manual
+  nfc
+  qr
+  face
+  fingerprint
+}
+
+enum GateEventType {
+  entry
+  exit
+}
+
+enum OfflineRecordType {
+  gate_log
+  attendance_record
+  boarding_roll
+}
+
+enum OfflineSyncStatus {
+  pending
+  processing
+  synced
+  failed
+}
+
+enum DormGender {
+  male
+  female
+}
+
+enum BoardingSessionType {
+  morning
+  evening
+}
+
+enum BoardingRollStatus {
+  present
+  absent
+  on_leave
+}
+
+enum StudentLeaveType {
+  short_leave
+  long_leave
+  weekend
+  emergency
+  medical
+  family
+  other
+  half_day
+  home_leave
+}
+
+enum StudentLeaveRequestSource {
+  patron_matron
+  parent_app
+  parent_phone
+  parent_visit
+  dod
+}
+
+enum StudentLeaveStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+enum AbsenceAlertType {
+  gate_exit_no_return
+  boarding_absent
+  consecutive_absent
+  leave_overdue
+  unauthorized_exit
+}
+
+enum AlertSeverity {
+  low
+  medium
+  high
+}
+
+enum AlertStatus {
+  active
+  resolved
+}
+
+enum VisitorType {
+  parent_guardian
+  organization
+}
+
+enum VisitorPurpose {
+  parent_visit
+  official_business
+  delivery
+  inspection
+  other
+}
+
+enum VisitorAppointmentStatus {
+  pending
+  confirmed
+  cancelled
+  completed
+}
+
+enum FeeAssignmentStatus {
+  unpaid
+  partial
+  paid
+  waived
+  overdue
+}
+
+enum PaymentMethod {
+  cash
+  mtn_momo
+  airtel_money
+  bank_transfer
+  cheque
+  other
+}
+
+enum ExamType {
+  cat
+  main_exam
+  mock
+  quiz
+  assignment
+}
+
+enum ExamStatus {
+  scheduled
+  ongoing
+  completed
+  cancelled
+}
+
+enum ExamModificationRequestStatus {
+  pending
+  approved
+  rejected
+}
+
+enum NotificationRecipientType {
+  parent
+  student
+  staff
+  admin
+  school
+}
+
+enum NotificationChannel {
+  sms
+  email
+  push
+  in_app
+}
+
+enum NotificationLanguage {
+  en
+  kin
+}
+
+enum NotificationStatus {
+  queued
+  sent
+  delivered
+  failed
+  retry
+}
+
+enum AuditActorType {
+  platform_user
+  school_user
+  system
+  api
+}
+
+enum AuditSeverity {
+  info
+  warning
+  critical
+}
+
+enum SystemSettingType {
+  string
+  integer
+  boolean
+  json
+}
+
+enum DeviceType {
+  tablet
+  kiosk
+  web
+}
+
+enum DeviceMode {
+  gate
+  boarding
+  classroom
+}
+
+enum TabletStatus {
+  online
+  offline
+  error
+  maintenance
+}
+
+// â”€â”€ New enums â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+enum BoardingStatus {
+  in_school
+  in_dormitory
+  on_short_leave
+  on_long_leave
+  on_medical_leave
+  absent
+  returned
+  exit_pending
+  exit_approved
+  outside_school
+}
+
+enum LeaveState {
+  draft
+  requested
+  pending_dod_approval
+  approved
+  rejected
+  awaiting_physical_exit
+  outside_school
+  returned
+  closed
+  cancelled
+}
+
+enum LeaveCategory {
+  short_leave
+  long_leave
+  medical_leave
+  emergency_leave
+}
+
+enum DiningMealType {
+  breakfast
+  lunch
+  dinner
+  snack
+}
+
+enum DiningScheduleScope {
+  dormitory
+  room
+  class
+}
+
+enum DiningAttendanceStatus {
+  present
+  absent
+  on_leave
+  excused
+}
+
+enum DeviceLocationScope {
+  gate
+  dormitory
+  dining_hall
+  classroom
+  library
+  other
+}
+
+enum BoardingAttendanceStatus {
+  present
+  late
+  missing_attendance
+  on_approved_leave
+  manual_adjusted
+}
+
+// â”€â”€ New models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model patron_dormitory_assignments {
+  id           BigInt      @id @default(autoincrement())
+  school_id    BigInt
+  user_id      BigInt
+  dormitory_id BigInt
+  assigned_by  BigInt?
+  assigned_at  DateTime    @default(now()) @db.Timestamptz(3)
+  is_active    Boolean     @default(true)
+  assignedBy   users?      @relation("patron_assigned_by", fields: [assigned_by], references: [id])
+  dormitory    dormitories @relation(fields: [dormitory_id], references: [id], onDelete: Cascade)
+  school       schools     @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  user         users       @relation("patron_assignments", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, dormitory_id])
+  @@index([school_id])
+  @@index([user_id])
+  @@index([dormitory_id])
+  @@index([is_active])
+}
+
+model gate_exit_records {
+  id             BigInt                 @id @default(autoincrement())
+  school_id      BigInt
+  leave_id       BigInt
+  student_id     BigInt
+  gate_keeper_id BigInt?
+  exit_at        DateTime               @default(now()) @db.Timestamptz(3)
+  return_at      DateTime?              @db.Timestamptz(3)
+  device_id      String?                @db.VarChar(50)
+  notes          String?
+  created_at     DateTime               @default(now()) @db.Timestamptz(3)
+  gate_keeper    users?                 @relation("exit_gate_keeper", fields: [gate_keeper_id], references: [id])
+  leave          student_leave_requests @relation(fields: [leave_id], references: [id], onDelete: Cascade)
+  school         schools                @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  student        students               @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([leave_id])
+  @@index([student_id])
+  @@index([exit_at])
+  @@index([return_at])
+}
+
+model boarding_attendance_windows {
+  id               BigInt                     @id @default(autoincrement())
+  school_id        BigInt
+  dormitory_id     BigInt?
+  name             String                     @db.VarChar(100)
+  start_time       DateTime                   @db.Time
+  end_time         DateTime                   @db.Time
+  grace_minutes    Int                        @default(0) @db.SmallInt
+  escalation_mins  Int                        @default(60) @db.SmallInt
+  is_active        Boolean                    @default(true)
+  applicable_days  String                     @default("mon,tue,wed,thu,fri,sat,sun") @db.VarChar(30)
+  created_by       BigInt?
+  created_at       DateTime                   @default(now()) @db.Timestamptz(3)
+  updated_at       DateTime                   @default(now()) @updatedAt @db.Timestamptz(3)
+  sessions         boarding_attendance_sessions[]
+  created_by_user  users?                     @relation("att_window_created_by", fields: [created_by], references: [id])
+  dormitory        dormitories?               @relation(fields: [dormitory_id], references: [id], onDelete: Cascade)
+  school           schools                    @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([dormitory_id])
+  @@index([is_active])
+}
+
+model boarding_attendance_sessions {
+  id              BigInt                       @id @default(autoincrement())
+  school_id       BigInt
+  window_id       BigInt?
+  dormitory_id    BigInt?
+  session_name    String?                      @db.VarChar(150)
+  location_type   String                       @default("dormitory") @db.VarChar(50)
+  created_by      BigInt?
+  session_date    DateTime                     @db.Date
+  window_start    DateTime?                    @db.Timestamptz(3)
+  window_end      DateTime?                    @db.Timestamptz(3)
+  reconciled_at   DateTime?                    @db.Timestamptz(3)
+  total_expected  Int                          @default(0)
+  total_present   Int                          @default(0)
+  total_late      Int                          @default(0)
+  total_on_leave  Int                          @default(0)
+  total_missing   Int                          @default(0)
+  notes           String?
+  created_at      DateTime                     @default(now()) @db.Timestamptz(3)
+  records         boarding_attendance_records[]
+  dormitory       dormitories?                 @relation(fields: [dormitory_id], references: [id], onDelete: Cascade)
+  school          schools                      @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  window          boarding_attendance_windows? @relation(fields: [window_id], references: [id], onDelete: SetNull)
+  creator         users?                       @relation("boarding_session_creator", fields: [created_by], references: [id], onDelete: SetNull)
+  @@index([school_id])
+  @@index([dormitory_id])
+  @@index([session_date])
+  @@index([reconciled_at])
+  @@index([location_type])
+  @@index([created_by])
+}
+
+model boarding_attendance_records {
+  id                  BigInt                    @id @default(autoincrement())
+  school_id           BigInt
+  session_id          BigInt
+  student_id          BigInt
+  dormitory_id        BigInt?
+  status              BoardingAttendanceStatus  @default(missing_attendance)
+  scan_time           DateTime?                 @db.Timestamptz(3)
+  biometric_log_id    BigInt?
+  is_manual           Boolean                   @default(false)
+  manual_reason       String?
+  corrected_by        BigInt?
+  corrected_at        DateTime?                 @db.Timestamptz(3)
+  original_status     BoardingAttendanceStatus?
+  parent_notified_at  DateTime?                 @db.Timestamptz(3)
+  escalated_at        DateTime?                 @db.Timestamptz(3)
+  notes               String?
+  created_at          DateTime                  @default(now()) @db.Timestamptz(3)
+  updated_at          DateTime                  @default(now()) @updatedAt @db.Timestamptz(3)
+  corrected_by_user   users?                    @relation("att_corrected_by", fields: [corrected_by], references: [id])
+  dormitory           dormitories?              @relation(fields: [dormitory_id], references: [id])
+  school              schools                   @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  session             boarding_attendance_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  student             students                  @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([session_id, student_id])
+  @@index([school_id])
+  @@index([session_id])
+  @@index([student_id])
+  @@index([dormitory_id])
+  @@index([status])
+  @@index([scan_time])
+  @@index([escalated_at])
+}
+
+model boarding_configurations {
+  id                          BigInt   @id @default(autoincrement())
+  school_id                   BigInt   @unique
+  require_student_photo       Boolean  @default(true)
+  require_biometric_return    Boolean  @default(true)
+  require_gate_exit_confirm   Boolean  @default(true)
+  parent_escalation_mins      Int      @default(60) @db.SmallInt
+  late_return_threshold_mins  Int      @default(15) @db.SmallInt
+  max_short_leave_hours       Int      @default(8) @db.SmallInt
+  max_long_leave_days         Int      @default(14) @db.SmallInt
+  sms_on_leave_approval       Boolean  @default(true)
+  sms_on_long_leave           Boolean  @default(true)
+  sms_on_medical_leave        Boolean  @default(true)
+  sms_on_missing_attendance   Boolean  @default(true)
+  sms_on_late_return          Boolean  @default(true)
+  created_at                  DateTime @default(now()) @db.Timestamptz(3)
+  updated_at                  DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  school                      schools  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+}
+
+model dining_menus {
+  id         BigInt             @id @default(autoincrement())
+  school_id  BigInt
+  name       String             @db.VarChar(100)
+  menu_type  String             @default("weekly") @db.VarChar(20)
+  start_date DateTime?          @db.Date
+  end_date   DateTime?          @db.Date
+  is_active  Boolean            @default(true)
+  created_by BigInt?
+  created_at DateTime           @default(now()) @db.Timestamptz(3)
+  updated_at DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
+  items      dining_menu_items[]
+  creator    users?             @relation("dining_menu_creator", fields: [created_by], references: [id])
+  school     schools            @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([is_active])
+  @@index([start_date])
+}
+
+model dining_menu_items {
+  id          BigInt         @id @default(autoincrement())
+  menu_id     BigInt
+  school_id   BigInt
+  day_of_week Int            @db.SmallInt
+  meal_type   DiningMealType
+  items       String
+  notes       String?
+  created_at  DateTime       @default(now()) @db.Timestamptz(3)
+  menu        dining_menus   @relation(fields: [menu_id], references: [id], onDelete: Cascade)
+  school      schools        @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([menu_id])
+  @@index([school_id])
+  @@index([day_of_week])
+}
+
+model dining_schedules {
+  id               BigInt              @id @default(autoincrement())
+  school_id        BigInt
+  scope            DiningScheduleScope @default(dormitory)
+  dormitory_id     BigInt?
+  room_id          BigInt?
+  class_id         BigInt?
+  meal_type        DiningMealType
+  start_time       DateTime            @db.Time
+  end_time         DateTime            @db.Time
+  applicable_days  String              @default("mon,tue,wed,thu,fri,sat,sun") @db.VarChar(30)
+  is_active        Boolean             @default(true)
+  created_by       BigInt?
+  created_at       DateTime            @default(now()) @db.Timestamptz(3)
+  updated_at       DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+  sessions         dining_sessions[]
+  class            classes?            @relation(fields: [class_id], references: [id])
+  created_by_user  users?              @relation("dining_sched_creator", fields: [created_by], references: [id])
+  dormitory        dormitories?        @relation(fields: [dormitory_id], references: [id], onDelete: Cascade)
+  room             dorm_rooms?         @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  school           schools             @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([dormitory_id])
+  @@index([meal_type])
+  @@index([is_active])
+}
+
+model dining_sessions {
+  id           BigInt             @id @default(autoincrement())
+  school_id    BigInt
+  schedule_id  BigInt?
+  dormitory_id BigInt?
+  class_id     BigInt?
+  gender_group String?             @db.VarChar(20)
+  meal_type    DiningMealType
+  session_date DateTime           @db.Date
+  opened_at    DateTime?          @db.Timestamptz(3)
+  closed_at    DateTime?          @db.Timestamptz(3)
+  marked_by    BigInt?
+  notes        String?
+  created_at   DateTime           @default(now()) @db.Timestamptz(3)
+  attendance   dining_attendance[]
+  dormitory    dormitories?       @relation(fields: [dormitory_id], references: [id], onDelete: Cascade)
+  class        classes?           @relation(fields: [class_id], references: [id])
+  marker       users?             @relation("dining_session_marker", fields: [marked_by], references: [id])
+  schedule     dining_schedules?  @relation(fields: [schedule_id], references: [id], onDelete: SetNull)
+  school       schools            @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id])
+  @@index([dormitory_id])
+  @@index([class_id])
+  @@index([session_date])
+  @@index([meal_type])
+}
+
+model dining_teacher_assignments {
+  id           BigInt   @id @default(autoincrement())
+  school_id    BigInt
+  teacher_id   BigInt
+  gender_group String   @db.VarChar(20)
+  start_date   DateTime @db.Date
+  end_date     DateTime @db.Date
+  assigned_by  BigInt?
+  created_at   DateTime @default(now()) @db.Timestamptz(3)
+  updated_at   DateTime @updatedAt @db.Timestamptz(3)
+  school       schools  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  teacher      users    @relation(fields: [teacher_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id, start_date, end_date])
+  @@index([teacher_id, start_date, end_date])
+  @@unique([school_id, teacher_id, gender_group, start_date, end_date])
+}
+
+model dining_attendance {
+  id           BigInt                 @id @default(autoincrement())
+  school_id    BigInt
+  session_id   BigInt
+  student_id   BigInt
+  status       DiningAttendanceStatus @default(absent)
+  marked_by    BigInt?
+  marked_at    DateTime?              @db.Timestamptz(3)
+  leave_status String?                @db.VarChar(50)
+  notes        String?                @db.VarChar(255)
+  created_at   DateTime               @default(now()) @db.Timestamptz(3)
+  marker       users?                 @relation("dining_att_marker", fields: [marked_by], references: [id])
+  school       schools                @relation(fields: [school_id], references: [id], onDelete: Cascade)
+  session      dining_sessions        @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  student      students               @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([session_id, student_id])
+  @@index([school_id])
+  @@index([session_id])
+  @@index([student_id])
+  @@index([status])
+}
+
+/// DOS-owned academic workflow records. `payload` stores the type-specific
+/// fields so new DOS workflows do not alter School Admin domain tables.
+model dos_work_items {
+  id          BigInt   @id @default(autoincrement())
+  school_id   BigInt
+  type        String   @db.VarChar(50)
+  title       String   @db.VarChar(255)
+  status      String   @default("open") @db.VarChar(30)
+  priority    String   @default("normal") @db.VarChar(20)
+  student_id  BigInt?
+  payload     Json
+  created_by  BigInt?
+  updated_by  BigInt?
+  created_at  DateTime @default(now()) @db.Timestamptz(3)
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  school      schools  @relation(fields: [school_id], references: [id], onDelete: Cascade)
+
+  @@index([school_id, type])
+  @@index([school_id, status])
+  @@index([school_id, student_id])
+  @@index([created_at])
+}

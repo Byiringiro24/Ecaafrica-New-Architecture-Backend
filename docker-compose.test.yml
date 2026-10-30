@@ -1,0 +1,19 @@
+﻿version: '3.8'
+services:
+  test-db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: artic_user
+      POSTGRES_PASSWORD: "Artic$2026"
+      POSTGRES_DB: ECAREAFRICA
+    ports:
+      # Maps host port (default 5433) to container. Override TEST_DB_PORT to change.
+      - "${TEST_DB_PORT:-15432}:5432"
+    volumes:
+      - ./pgdata_test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

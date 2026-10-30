@@ -1,0 +1,55 @@
+SMS
+Send and manage SMS messages
+
+POST
+/api/v1/sms/send
+Auth Required
+Send a single SMS to one recipient
+
+Parameter	Type	Required	Description
+recipient	string	Yes	Phone number — format: 2507XXXXXXXX
+message	string	Yes	SMS content (max 160 characters)
+sender_id	string	No	Custom sender ID (max 11 characters)
+schedule_at	datetime	No	Schedule delivery — format: YYYY-MM-DD HH:MM:SS
+
+
+POST /api/v1/sms/send
+
+// Headers
+Authorization: Bearer your_api_key
+X-API-SECRET: your_secret
+Content-Type: application/json
+
+{
+  "recipient": "250788123456",
+  "message": "Your order has been confirmed!",
+  "sender_id": "MYCOMPANY"
+}
+
+// Response
+{
+  "success": true,
+  "message": "SMS sent successfully",
+  "data": {
+    "message_id": 123,
+    "status": "sent",
+    "cost": 50,
+    "balance": 4950
+  }
+}
+
+
+
+Base URL:  https://smsconnect.tech/api/v1
+
+sk_uVdIILaqwe4TjcdUnGeW7oPGNVZVVQYv
+
+
+ Send SMS
+POST /api/sms/send
+ Check Balance
+GET /api/wallet/balance
+ SMS History
+GET /api/sms/history
+ Delivery Status
+GET /api/sms/status/{id}

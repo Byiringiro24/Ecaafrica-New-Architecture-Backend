@@ -1,0 +1,4110 @@
+openapi: 3.0.3
+info:
+  title: Education Care Africa — Backend API
+  description: |
+    Full REST API for the Education Care Africa school management platform.
+
+    ## Authentication
+    - **School endpoints** require a JWT issued by `POST /auth/login`
+    - **Platform endpoints** require a JWT issued by `POST /auth/platform/login`
+    - Send tokens via the `Authorization: Bearer <accessToken>` header
+
+    ## Response Envelope
+    All responses follow a consistent envelope:
+    ```json
+    { "success": true, "data": {}, "meta": { "page": 1, "limit": 20, "total": 1 } }
+    ```
+    Error responses:
+    ```json
+    { "success": false, "error": { "code": "bad_request", "message": "Validation failed", "details": [] } }
+    ```
+
+    ## Pagination
+    Most list endpoints accept: `page`, `limit` (max 100), `sort`, `order` (asc|desc), `q` (search)
+
+    ## File Uploads
+    - `POST /students/import` — multipart/form-data, field: `file`
+    - `POST /students/:id/photo` — multipart/form-data, field: `photo`
+    - `POST /fees/transactions/:id/receipt` — multipart/form-data, field: `receipt`
+
+  version: 1.0.0
+  contact:
+    name: Education Care Africa Support
+    email: support@educationcare.africa
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local development server
+  - url: https://api.educationcare.africa/api/v1
+    description: Production server
+
+tags:
+  - name: Docs
+    description: API documentation and test tools
+  - name: Auth
+    description: Authentication — school and platform
+  - name: Users
+    description: School user management
+  - name: Roles
+    description: Role and permission management
+  - name: Academic Years
+    description: Academic year management
+  - name: Terms
+    description: Term management
+  - name: Classes
+    description: Class management
+  - name: Sections
+    description: Section (stream) management
+  - name: Subjects
+    description: Subject management
+  - name: Teacher Assignments
+    description: Teacher–section–subject assignments
+  - name: Timetable
+    description: Timetable periods and slots
+  - name: Holidays
+    description: Holiday calendar
+  - name: Students
+    description: Student records, enrollments, parents, photos
+  - name: Parents
+    description: Parent/guardian profiles
+  - name: Biometrics
+    description: Biometric enrollment (face, fingerprint, NFC, QR)
+  - name: Attendance
+    description: Attendance sessions and records
+  - name: Gate Logs
+    description: Gate entry/exit events
+  - name: Boarding
+    description: Dormitories, rooms, assignments, roll calls
+  - name: Student Leaves
+    description: Student leave requests and approvals
+  - name: Absence Alerts
+    description: Automated absence alerts
+  - name: Offline Sync
+    description: Offline device record synchronisation
+  - name: Fees
+    description: Fee structures, assignments, and transactions
+  - name: Exams
+    description: Exams and results
+  - name: Visitors
+    description: Visitor management and appointments
+  - name: Devices
+    description: Registered tablets and kiosk devices
+  - name: Staff
+    description: Staff profiles and leave balances
+  - name: Salary
+    description: Salary records and payroll
+  - name: Notifications
+    description: Notifications, templates, and logs
+  - name: Audit Logs
+    description: Audit trail for all actions
+  - name: System Settings
+    description: School-level system settings
+  - name: Feature Flags
+    description: Platform-level feature flag management
+  - name: Platform Schools
+    description: Platform admin — school management
+  - name: Platform Plans
+    description: Platform admin — subscription plan management
+  - name: Platform Subscriptions
+    description: Platform admin — school subscriptions
+  - name: Platform Invoices
+    description: Platform admin — billing invoices
+  - name: Platform Revenue
+    description: Platform admin — revenue reporting
+  - name: Platform Users
+    description: Platform admin — user management
+  - name: Platform Announcements
+    description: Platform admin — announcements
+  - name: Support Tickets
+    description: Platform admin — support ticket management
+  - name: SMS Providers
+    description: Platform admin — SMS gateway providers
+
+# ─────────────────────────────────────────────────────────────────
+# SECURITY
+# ─────────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  # ── Reusable responses ───────────────────────────────────────
+  responses:
+    Unauthorized:
+      description: Missing or invalid token
+      /api/doc/test:
+        servers:
+          - url: http://localhost:5000
+            description: Local development server
+          - url: https://api.educationcare.africa
+            description: Production server
+        get:
+          tags: [Docs]
+          summary: API tester UI
+          description: Serves the API tester HTML page.
+          responses:
+            '200':
+
+      /api/doc/swagger:
+        servers:
+          - url: http://localhost:5000
+            description: Local development server
+          - url: https://api.educationcare.africa
+            description: Production server
+        get:
+          tags: [Docs]
+          summary: Swagger/OpenAPI spec
+          description: Serves the OpenAPI specification file.
+          responses:
+            '200':
+            $ref: '#/components/schemas/ErrorResponse'
+
+  # ── Reusable parameters ──────────────────────────────────────
+  parameters:
+    pageParam:
+      name: page
+      in: query
+      schema: { type: integer, default: 1 }
+    limitParam:
+      name: limit
+      in: query
+      schema: { type: integer, default: 20, maximum: 100 }
+    sortParam:
+      name: sort
+      in: query
+      schema: { type: string }
+    orderParam:
+      name: order
+      in: query
+      schema: { type: string, enum: [asc, desc] }
+    qParam:
+      name: q
+      in: query
+      schema: { type: string }
+    includeDeletedParam:
+      name: include_deleted
+      in: query
+      schema: { type: boolean }
+    idPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+
+  # ── Reusable schemas ─────────────────────────────────────────
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              type: array
+              items: { type: string }
+
+    Meta:
+      type: object
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+
+    # Auth
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, example: admin@school.test }
+        password: { type: string, example: password123 }
+
+    AuthResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            user: { $ref: '#/components/schemas/User' }
+            accessToken: { type: string }
+            refreshToken: { type: string }
+
+    # User
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        uuid: { type: string }
+        school_id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        role:
+          type: string
+          enum: [school_admin, teacher, staff, parent, student]
+        status:
+          type: string
+          enum: [active, inactive, locked, pending]
+        avatar_url: { type: string, nullable: true }
+
+    # Role
+    Role:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+        is_system: { type: boolean }
+
+    # Academic Year
+    AcademicYear:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string, example: 2025/2026 }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        is_current: { type: boolean }
+
+    # Term
+    Term:
+      type: object
+      properties:
+        id: { type: string }
+        academic_year_id: { type: string }
+        name: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        is_current: { type: boolean }
+
+    # Class
+    Class:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        level: { type: integer }
+        description: { type: string }
+        academic_year_id: { type: string }
+
+    # Section
+    Section:
+      type: object
+      properties:
+        id: { type: string }
+        class_id: { type: string }
+        name: { type: string }
+        full_name: { type: string }
+        class_teacher_id: { type: string, nullable: true }
+        capacity: { type: integer }
+        room: { type: string }
+
+    # Subject
+    Subject:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        code: { type: string }
+        description: { type: string }
+
+    # Student
+    Student:
+      type: object
+      properties:
+        id: { type: string }
+        student_id_number: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+        other_names: { type: string }
+        date_of_birth: { type: string, format: date }
+        gender: { type: string, enum: [male, female, other] }
+        national_id: { type: string }
+        nationality: { type: string }
+        student_type: { type: string, enum: [boarding, day] }
+        status: { type: string, enum: [active, inactive, transferred, graduated, expelled] }
+        photo_url: { type: string, nullable: true }
+        address: { type: string }
+        admission_date: { type: string, format: date }
+        enrollment_year: { type: integer }
+
+    # Parent
+    Parent:
+      type: object
+      properties:
+        id: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+        phone: { type: string }
+        email: { type: string }
+        relationship: { type: string }
+        address: { type: string }
+        occupation: { type: string }
+
+    # Exam
+    Exam:
+      type: object
+      properties:
+        id: { type: string }
+        section_id: { type: string }
+        subject_id: { type: string }
+        teacher_id: { type: string }
+        term_id: { type: string }
+        name: { type: string }
+        type: { type: string, enum: [cat, main_exam, mock, quiz, assignment] }
+        exam_date: { type: string, format: date }
+        start_time: { type: string }
+        duration_min: { type: integer }
+        max_marks: { type: number }
+        pass_mark: { type: number }
+        status: { type: string, enum: [scheduled, ongoing, completed, cancelled] }
+
+    # Fee Structure
+    FeeStructure:
+      type: object
+      properties:
+        id: { type: string }
+        academic_year_id: { type: string }
+        term_id: { type: string }
+        class_id: { type: string }
+        name: { type: string }
+        amount: { type: number }
+        currency: { type: string, example: RWF }
+        is_mandatory: { type: boolean }
+        due_date: { type: string, format: date }
+
+    # Platform School
+    PlatformSchool:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        school_type: { type: string, enum: [government, private, international, technical, seminary, other] }
+        province: { type: string }
+        district: { type: string }
+        status: { type: string, enum: [active, trial, grace, suspended, expired, cancelled] }
+        timezone: { type: string }
+        currency: { type: string }
+        has_boarding: { type: boolean }
+        has_biometrics: { type: boolean }
+        has_gate: { type: boolean }
+        has_visitor_mgmt: { type: boolean }
+        has_exam_system: { type: boolean }
+        has_salary_mgmt: { type: boolean }
+        has_parent_app: { type: boolean }
+        has_bulk_sms: { type: boolean }
+
+# ─────────────────────────────────────────────────────────────────
+# PATHS
+# ─────────────────────────────────────────────────────────────────
+paths:
+
+  # ══════════════════════════════════════════════════════════════
+  # DOCS
+  # ══════════════════════════════════════════════════════════════
+  /doc/test:
+    get:
+      tags: [Docs]
+      summary: API tester UI
+      description: Serves the API tester HTML page.
+      responses:
+        '200':
+          description: HTML page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /doc/swagger:
+    get:
+      tags: [Docs]
+      summary: Swagger/OpenAPI spec
+      description: Serves the OpenAPI specification file.
+      responses:
+        '200':
+          description: OpenAPI document
+          content:
+            application/yaml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: object
+
+  # ══════════════════════════════════════════════════════════════
+  # AUTH
+  # ══════════════════════════════════════════════════════════════
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: School login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/platform/login:
+    post:
+      tags: [Auth]
+      summary: Platform admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Platform login successful
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout (school or platform)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionId: { type: string }
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: Logged out
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: New tokens issued
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          description: Reset link sent (if account exists)
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password using token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword, confirmPassword]
+              properties:
+                token: { type: string }
+                newPassword: { type: string }
+                confirmPassword: { type: string }
+      responses:
+        '200':
+          description: Password reset successful
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current authenticated user
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Current user profile
+
+  # ══════════════════════════════════════════════════════════════
+  # USERS
+  # ══════════════════════════════════════════════════════════════
+  /users:
+    get:
+      tags: [Users]
+      summary: List school users
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+        - { $ref: '#/components/parameters/qParam' }
+        - name: role
+          in: query
+          schema: { type: string, enum: [school_admin, teacher, staff, parent, student] }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, inactive, locked, pending] }
+        - { $ref: '#/components/parameters/includeDeletedParam' }
+      responses:
+        '200': { description: List of users }
+    post:
+      tags: [Users]
+      summary: Create school user
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, role, password]
+              properties:
+                name: { type: string }
+                email: { type: string }
+                phone: { type: string }
+                role: { type: string, enum: [school_admin, teacher, staff, parent, student] }
+                status: { type: string, enum: [active, inactive, locked, pending] }
+                password: { type: string }
+                avatar_url: { type: string, nullable: true }
+      responses:
+        '201': { description: User created }
+
+  /users/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Users]
+      summary: Get user by ID
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: User object }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Users]
+      summary: Update user
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                email: { type: string }
+                phone: { type: string }
+                role: { type: string }
+                status: { type: string }
+                avatar_url: { type: string, nullable: true }
+                password: { type: string }
+      responses:
+        '200': { description: Updated user }
+    delete:
+      tags: [Users]
+      summary: Delete user
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted user }
+
+  /users/{id}/roles:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    post:
+      tags: [Users]
+      summary: Assign role to user
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role_id]
+              properties:
+                role_id: { type: string }
+      responses:
+        '200': { description: Updated user with roles }
+
+  /users/{id}/roles/{roleId}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+      - name: roleId
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [Users]
+      summary: Remove role from user
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated user with roles }
+
+  # ══════════════════════════════════════════════════════════════
+  # ROLES
+  # ══════════════════════════════════════════════════════════════
+  /roles:
+    get:
+      tags: [Roles]
+      summary: List roles
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+        - { $ref: '#/components/parameters/qParam' }
+        - { $ref: '#/components/parameters/includeDeletedParam' }
+      responses:
+        '200': { description: List of roles }
+    post:
+      tags: [Roles]
+      summary: Create role
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug]
+              properties:
+                name: { type: string }
+                slug: { type: string }
+                permissions: { type: array, items: { type: string } }
+                is_system: { type: boolean }
+      responses:
+        '201': { description: Role created }
+
+  /roles/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Roles]
+      summary: Get role
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Role object }
+    patch:
+      tags: [Roles]
+      summary: Update role
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                slug: { type: string }
+                permissions: { type: array, items: { type: string } }
+      responses:
+        '200': { description: Updated role }
+    delete:
+      tags: [Roles]
+      summary: Delete role
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted role }
+
+  # ══════════════════════════════════════════════════════════════
+  # ACADEMIC YEARS
+  # ══════════════════════════════════════════════════════════════
+  /academic-years:
+    get:
+      tags: [Academic Years]
+      summary: List academic years
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+        - { $ref: '#/components/parameters/includeDeletedParam' }
+      responses:
+        '200': { description: List of academic years }
+    post:
+      tags: [Academic Years]
+      summary: Create academic year
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AcademicYear' }
+      responses:
+        '201': { description: Academic year created }
+
+  /academic-years/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Academic Years]
+      summary: Get academic year
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Academic year }
+    patch:
+      tags: [Academic Years]
+      summary: Update academic year
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AcademicYear' }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Academic Years]
+      summary: Delete academic year
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # TERMS
+  # ══════════════════════════════════════════════════════════════
+  /terms:
+    get:
+      tags: [Terms]
+      summary: List terms
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+        - name: academic_year_id
+          in: query
+          schema: { type: string }
+        - { $ref: '#/components/parameters/includeDeletedParam' }
+      responses:
+        '200': { description: List of terms }
+    post:
+      tags: [Terms]
+      summary: Create term
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Term' }
+      responses:
+        '201': { description: Term created }
+
+  /terms/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Terms]
+      summary: Get term
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Term }
+    patch:
+      tags: [Terms]
+      summary: Update term
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Term' }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Terms]
+      summary: Delete term
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # CLASSES
+  # ══════════════════════════════════════════════════════════════
+  /classes:
+    get:
+      tags: [Classes]
+      summary: List classes
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+        - { $ref: '#/components/parameters/qParam' }
+        - name: academic_year_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: List of classes }
+    post:
+      tags: [Classes]
+      summary: Create class
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Class' }
+      responses:
+        '201': { description: Class created }
+
+  /classes/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Classes]
+      summary: Get class
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Class }
+    patch:
+      tags: [Classes]
+      summary: Update class
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Class' }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Classes]
+      summary: Delete class
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # SECTIONS
+  # ══════════════════════════════════════════════════════════════
+  /sections:
+    get:
+      tags: [Sections]
+      summary: List sections
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+        - name: class_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: List of sections }
+    post:
+      tags: [Sections]
+      summary: Create section
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Section' }
+      responses:
+        '201': { description: Section created }
+
+  /sections/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Sections]
+      summary: Get section
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Section }
+    patch:
+      tags: [Sections]
+      summary: Update section
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Section' }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Sections]
+      summary: Delete section
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # SUBJECTS
+  # ══════════════════════════════════════════════════════════════
+  /subjects:
+    get:
+      tags: [Subjects]
+      summary: List subjects
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+        - { $ref: '#/components/parameters/qParam' }
+      responses:
+        '200': { description: List of subjects }
+    post:
+      tags: [Subjects]
+      summary: Create subject
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Subject' }
+      responses:
+        '201': { description: Subject created }
+
+  /subjects/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Subjects]
+      summary: Get subject
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Subject }
+    patch:
+      tags: [Subjects]
+      summary: Update subject
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Subject' }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Subjects]
+      summary: Delete subject
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # TEACHER-SECTION-SUBJECTS
+  # ══════════════════════════════════════════════════════════════
+  /teacher-section-subjects:
+    get:
+      tags: [Teacher Assignments]
+      summary: List teacher–section–subject assignments
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+        - name: teacher_id
+          in: query
+          schema: { type: string }
+        - name: section_id
+          in: query
+          schema: { type: string }
+        - name: subject_id
+          in: query
+          schema: { type: string }
+        - name: term_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: List of assignments }
+    post:
+      tags: [Teacher Assignments]
+      summary: Create teacher assignment
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teacher_id, section_id, subject_id, term_id]
+              properties:
+                teacher_id: { type: string }
+                section_id: { type: string }
+                subject_id: { type: string }
+                term_id: { type: string }
+      responses:
+        '201': { description: Assignment created }
+
+  /teacher-section-subjects/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Teacher Assignments]
+      summary: Get assignment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Assignment }
+    patch:
+      tags: [Teacher Assignments]
+      summary: Update assignment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Teacher Assignments]
+      summary: Delete assignment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # TIMETABLE
+  # ══════════════════════════════════════════════════════════════
+  /timetable-periods:
+    get:
+      tags: [Timetable]
+      summary: List timetable periods
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: List of periods }
+    post:
+      tags: [Timetable]
+      summary: Create timetable period
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, start_time, end_time]
+              properties:
+                name: { type: string }
+                start_time: { type: string, example: '08:00' }
+                end_time: { type: string, example: '08:45' }
+                is_break: { type: boolean }
+                sort_order: { type: integer }
+      responses:
+        '201': { description: Period created }
+
+  /timetable-periods/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Timetable]
+      summary: Get period
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Period }
+    patch:
+      tags: [Timetable]
+      summary: Update period
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Timetable]
+      summary: Delete period
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /timetable-slots:
+    get:
+      tags: [Timetable]
+      summary: List timetable slots
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: section_id
+          in: query
+          schema: { type: string }
+        - name: term_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: List of slots }
+    post:
+      tags: [Timetable]
+      summary: Create timetable slot
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [section_id, subject_id, teacher_id, period_id, day_of_week, term_id]
+              properties:
+                section_id: { type: string }
+                subject_id: { type: string }
+                teacher_id: { type: string }
+                period_id: { type: string }
+                day_of_week: { type: integer, minimum: 1, maximum: 7 }
+                room: { type: string }
+                term_id: { type: string }
+      responses:
+        '201': { description: Slot created }
+
+  /timetable-slots/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Timetable]
+      summary: Get timetable slot
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Slot }
+    patch:
+      tags: [Timetable]
+      summary: Update slot
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Timetable]
+      summary: Delete slot
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # HOLIDAYS
+  # ══════════════════════════════════════════════════════════════
+  /holidays:
+    get:
+      tags: [Holidays]
+      summary: List holidays
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: List of holidays }
+    post:
+      tags: [Holidays]
+      summary: Create holiday
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, start_date, end_date, type]
+              properties:
+                name: { type: string }
+                start_date: { type: string, format: date }
+                end_date: { type: string, format: date }
+                type: { type: string, enum: [national, school, exam, other] }
+      responses:
+        '201': { description: Holiday created }
+
+  /holidays/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Holidays]
+      summary: Get holiday
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Holiday }
+    patch:
+      tags: [Holidays]
+      summary: Update holiday
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Holidays]
+      summary: Delete holiday
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # STUDENTS
+  # ══════════════════════════════════════════════════════════════
+  /students:
+    get:
+      tags: [Students]
+      summary: List students
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+        - { $ref: '#/components/parameters/qParam' }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, inactive, transferred, graduated, expelled] }
+        - name: student_type
+          in: query
+          schema: { type: string, enum: [boarding, day] }
+      responses:
+        '200': { description: List of students }
+    post:
+      tags: [Students]
+      summary: Create student
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Student' }
+      responses:
+        '201': { description: Student created }
+
+  /students/import:
+    post:
+      tags: [Students]
+      summary: Import students via CSV
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200': { description: Import summary }
+
+  /students/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Students]
+      summary: Get student
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Student }
+    patch:
+      tags: [Students]
+      summary: Update student
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Student' }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Students]
+      summary: Delete student
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /students/{id}/photo:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    post:
+      tags: [Students]
+      summary: Upload student photo
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo:
+                  type: string
+                  format: binary
+      responses:
+        '200': { description: Updated student with photo_url }
+
+  /students/{id}/enrollments:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    post:
+      tags: [Students]
+      summary: Enroll student in section
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [section_id, academic_year_id, term_id]
+              properties:
+                section_id: { type: string }
+                academic_year_id: { type: string }
+                term_id: { type: string }
+                enrolled_at: { type: string, format: date }
+                status: { type: string, enum: [active, transferred, dropped] }
+      responses:
+        '201': { description: Enrollment created }
+    get:
+      tags: [Students]
+      summary: List student enrollments
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Enrollment list }
+
+  /students/{id}/parents:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    post:
+      tags: [Students]
+      summary: Link parent to student
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [parent_id]
+              properties:
+                parent_id: { type: string }
+                is_primary: { type: boolean }
+      responses:
+        '200': { description: Linked parent }
+
+  /students/{id}/parents/{parentId}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+      - name: parentId
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [Students]
+      summary: Unlink parent from student
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Unlinked }
+
+  # ══════════════════════════════════════════════════════════════
+  # PARENTS
+  # ══════════════════════════════════════════════════════════════
+  /parents:
+    get:
+      tags: [Parents]
+      summary: List parents
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+        - { $ref: '#/components/parameters/qParam' }
+      responses:
+        '200': { description: List of parents }
+    post:
+      tags: [Parents]
+      summary: Create parent
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Parent' }
+      responses:
+        '201': { description: Parent created }
+
+  /parents/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Parents]
+      summary: Get parent
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Parent }
+    patch:
+      tags: [Parents]
+      summary: Update parent
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Parents]
+      summary: Delete parent
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # BIOMETRICS
+  # ══════════════════════════════════════════════════════════════
+  /biometric-enrollments:
+    get:
+      tags: [Biometrics]
+      summary: List biometric enrollments
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: student_id
+          in: query
+          schema: { type: string }
+        - name: type
+          in: query
+          schema: { type: string, enum: [face, fingerprint, card_nfc, card_qr] }
+        - name: is_active
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200': { description: List of enrollments }
+    post:
+      tags: [Biometrics]
+      summary: Create biometric enrollment
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, type, enrolled_by]
+              properties:
+                student_id: { type: string }
+                type: { type: string, enum: [face, fingerprint, card_nfc, card_qr] }
+                template_hash: { type: string, description: Required for face/fingerprint }
+                card_uid: { type: string, description: Required for card types }
+                enrolled_by: { type: string }
+                is_active: { type: boolean }
+      responses:
+        '201': { description: Enrollment created }
+
+  /biometric-enrollments/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Biometrics]
+      summary: Get enrollment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Enrollment }
+    patch:
+      tags: [Biometrics]
+      summary: Update enrollment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Biometrics]
+      summary: Delete enrollment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # ATTENDANCE
+  # ══════════════════════════════════════════════════════════════
+  /attendance/sessions:
+    get:
+      tags: [Attendance]
+      summary: List attendance sessions
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: section_id
+          in: query
+          schema: { type: string }
+        - name: session_type
+          in: query
+          schema: { type: string, enum: [class, gate, boarding_morning, boarding_evening] }
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: List of sessions }
+    post:
+      tags: [Attendance]
+      summary: Create attendance session
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [section_id, session_date, session_type]
+              properties:
+                section_id: { type: string }
+                subject_id: { type: string }
+                teacher_id: { type: string }
+                period_id: { type: string }
+                session_date: { type: string, format: date }
+                session_type: { type: string, enum: [class, gate, boarding_morning, boarding_evening] }
+                started_at: { type: string, format: date-time }
+                notes: { type: string }
+      responses:
+        '201': { description: Session created }
+
+  /attendance/sessions/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Attendance]
+      summary: Get session
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Session }
+    patch:
+      tags: [Attendance]
+      summary: Update session
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Attendance]
+      summary: Delete session
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /attendance/sessions/{id}/close:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    patch:
+      tags: [Attendance]
+      summary: Close attendance session
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Session closed }
+
+  /attendance/records:
+    get:
+      tags: [Attendance]
+      summary: List attendance records
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: session_id
+          in: query
+          schema: { type: string }
+        - name: student_id
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [present, absent, late, excused] }
+      responses:
+        '200': { description: List of records }
+    post:
+      tags: [Attendance]
+      summary: Create attendance record
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session_id, student_id, status]
+              properties:
+                session_id: { type: string }
+                student_id: { type: string }
+                status: { type: string, enum: [present, absent, late, excused] }
+                scan_method: { type: string, enum: [manual, nfc, qr, face, fingerprint] }
+                notes: { type: string }
+      responses:
+        '201': { description: Record created }
+
+  /attendance/records/bulk:
+    post:
+      tags: [Attendance]
+      summary: Bulk create attendance records
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session_id, records]
+              properties:
+                session_id: { type: string }
+                scan_method: { type: string }
+                records:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      student_id: { type: string }
+                      status: { type: string }
+                      notes: { type: string }
+      responses:
+        '200': { description: Bulk insert summary }
+
+  /attendance/records/summary:
+    get:
+      tags: [Attendance]
+      summary: Attendance summary
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: start_date
+          in: query
+          schema: { type: string, format: date }
+        - name: end_date
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: Summary object }
+
+  /attendance/records/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    delete:
+      tags: [Attendance]
+      summary: Delete attendance record
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # GATE LOGS
+  # ══════════════════════════════════════════════════════════════
+  /gate/logs:
+    get:
+      tags: [Gate Logs]
+      summary: List gate logs
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: student_id
+          in: query
+          schema: { type: string }
+        - name: event_type
+          in: query
+          schema: { type: string, enum: [entry, exit] }
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+        - name: is_flagged
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200': { description: List of gate logs }
+    post:
+      tags: [Gate Logs]
+      summary: Create gate log
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, event_type, scan_method]
+              properties:
+                student_id: { type: string }
+                event_type: { type: string, enum: [entry, exit] }
+                scan_method: { type: string, enum: [manual, nfc, qr, face, fingerprint] }
+                device_id: { type: string }
+                is_flagged: { type: boolean }
+                flag_reason: { type: string, nullable: true }
+      responses:
+        '201': { description: Gate log created }
+
+  /gate/logs/active-on-campus:
+    get:
+      tags: [Gate Logs]
+      summary: List students currently on campus
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Active students on campus }
+
+  /gate/logs/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Gate Logs]
+      summary: Get gate log
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Gate log }
+    patch:
+      tags: [Gate Logs]
+      summary: Update gate log
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Gate Logs]
+      summary: Delete gate log
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # BOARDING — DORMITORIES
+  # ══════════════════════════════════════════════════════════════
+  /boarding/dormitories:
+    get:
+      tags: [Boarding]
+      summary: List dormitories
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: gender
+          in: query
+          schema: { type: string, enum: [male, female] }
+      responses:
+        '200': { description: List of dormitories }
+    post:
+      tags: [Boarding]
+      summary: Create dormitory
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, gender, capacity]
+              properties:
+                name: { type: string }
+                gender: { type: string, enum: [male, female] }
+                capacity: { type: integer }
+                supervisor_id: { type: string }
+                description: { type: string }
+      responses:
+        '201': { description: Dormitory created }
+
+  /boarding/dormitories/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Boarding]
+      summary: Get dormitory
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Dormitory }
+    patch:
+      tags: [Boarding]
+      summary: Update dormitory
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Boarding]
+      summary: Delete dormitory
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /boarding/rooms:
+    get:
+      tags: [Boarding]
+      summary: List rooms
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: dormitory_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: List of rooms }
+    post:
+      tags: [Boarding]
+      summary: Create room
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dormitory_id, room_number, capacity]
+              properties:
+                dormitory_id: { type: string }
+                room_number: { type: string }
+                capacity: { type: integer }
+      responses:
+        '201': { description: Room created }
+
+  /boarding/rooms/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Boarding]
+      summary: Get room
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Room }
+    patch:
+      tags: [Boarding]
+      summary: Update room
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Boarding]
+      summary: Delete room
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /boarding/assignments:
+    get:
+      tags: [Boarding]
+      summary: List boarding assignments
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: student_id
+          in: query
+          schema: { type: string }
+        - name: dormitory_id
+          in: query
+          schema: { type: string }
+        - name: academic_year_id
+          in: query
+          schema: { type: string }
+        - name: is_active
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200': { description: List of assignments }
+    post:
+      tags: [Boarding]
+      summary: Create boarding assignment
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, dormitory_id, room_id, academic_year_id]
+              properties:
+                student_id: { type: string }
+                dormitory_id: { type: string }
+                room_id: { type: string }
+                bed_number: { type: string }
+                academic_year_id: { type: string }
+                assigned_at: { type: string, format: date }
+                left_at: { type: string, format: date, nullable: true }
+      responses:
+        '201': { description: Assignment created }
+
+  /boarding/assignments/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Boarding]
+      summary: Get assignment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Assignment }
+    patch:
+      tags: [Boarding]
+      summary: Update assignment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Boarding]
+      summary: Delete assignment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /boarding/roll-calls:
+    get:
+      tags: [Boarding]
+      summary: List roll calls
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: dormitory_id
+          in: query
+          schema: { type: string }
+        - name: roll_date
+          in: query
+          schema: { type: string, format: date }
+        - name: session_type
+          in: query
+          schema: { type: string, enum: [morning, evening] }
+      responses:
+        '200': { description: List of roll calls }
+    post:
+      tags: [Boarding]
+      summary: Create roll call
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dormitory_id, roll_date, session_type, conducted_by]
+              properties:
+                dormitory_id: { type: string }
+                roll_date: { type: string, format: date }
+                session_type: { type: string, enum: [morning, evening] }
+                conducted_by: { type: string }
+                notes: { type: string }
+      responses:
+        '201': { description: Roll call created }
+
+  /boarding/roll-calls/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Boarding]
+      summary: Get roll call
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Roll call }
+    patch:
+      tags: [Boarding]
+      summary: Update roll call
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Boarding]
+      summary: Delete roll call
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /boarding/roll-calls/{id}/records:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    post:
+      tags: [Boarding]
+      summary: Add roll call record
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, status]
+              properties:
+                student_id: { type: string }
+                status: { type: string, enum: [present, absent, on_leave] }
+                notes: { type: string }
+      responses:
+        '201': { description: Record added }
+
+  /boarding/roll-calls/{id}/records/bulk:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    post:
+      tags: [Boarding]
+      summary: Bulk add roll call records
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [records]
+              properties:
+                records:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      student_id: { type: string }
+                      status: { type: string }
+      responses:
+        '200': { description: Bulk summary }
+
+  /boarding/roll-calls/{id}/summary:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Boarding]
+      summary: Get roll call summary
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Summary }
+
+  # ══════════════════════════════════════════════════════════════
+  # STUDENT LEAVES
+  # ══════════════════════════════════════════════════════════════
+  /boarding/student-leaves:
+    get:
+      tags: [Student Leaves]
+      summary: List student leaves
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: student_id
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, approved, rejected, cancelled] }
+      responses:
+        '200': { description: List of leaves }
+    post:
+      tags: [Student Leaves]
+      summary: Create student leave
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, leave_type, start_date, end_date]
+              properties:
+                student_id: { type: string }
+                parent_id: { type: string }
+                leave_type: { type: string, enum: [weekend, emergency, medical, family, other] }
+                start_date: { type: string, format: date }
+                end_date: { type: string, format: date }
+                reason: { type: string }
+      responses:
+        '201': { description: Leave created }
+
+  /boarding/student-leaves/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Student Leaves]
+      summary: Get leave
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Leave }
+    patch:
+      tags: [Student Leaves]
+      summary: Update leave
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Student Leaves]
+      summary: Delete leave
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /boarding/student-leaves/{id}/approve:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    patch:
+      tags: [Student Leaves]
+      summary: Approve leave
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Leave approved }
+
+  /boarding/student-leaves/{id}/reject:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    patch:
+      tags: [Student Leaves]
+      summary: Reject leave
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rejection_reason]
+              properties:
+                rejection_reason: { type: string }
+      responses:
+        '200': { description: Leave rejected }
+
+  # ══════════════════════════════════════════════════════════════
+  # ABSENCE ALERTS
+  # ══════════════════════════════════════════════════════════════
+  /boarding/absence-alerts:
+    get:
+      tags: [Absence Alerts]
+      summary: List absence alerts
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: student_id
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, resolved] }
+        - name: severity
+          in: query
+          schema: { type: string, enum: [low, medium, high] }
+      responses:
+        '200': { description: List of alerts }
+    post:
+      tags: [Absence Alerts]
+      summary: Create absence alert
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, alert_type, severity]
+              properties:
+                student_id: { type: string }
+                alert_type: { type: string, enum: [gate_exit_no_return, boarding_absent, consecutive_absent, leave_overdue, unauthorized_exit] }
+                severity: { type: string, enum: [low, medium, high] }
+                description: { type: string }
+      responses:
+        '201': { description: Alert created }
+
+  /boarding/absence-alerts/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Absence Alerts]
+      summary: Get absence alert
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Alert }
+    patch:
+      tags: [Absence Alerts]
+      summary: Update alert
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Absence Alerts]
+      summary: Delete alert
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /boarding/absence-alerts/{id}/resolve:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    patch:
+      tags: [Absence Alerts]
+      summary: Resolve absence alert
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resolution_note]
+              properties:
+                resolution_note: { type: string }
+      responses:
+        '200': { description: Alert resolved }
+
+  # ══════════════════════════════════════════════════════════════
+  # OFFLINE SYNC
+  # ══════════════════════════════════════════════════════════════
+  /offline-sync:
+    post:
+      tags: [Offline Sync]
+      summary: Submit offline records for sync
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id, records]
+              properties:
+                device_id: { type: string }
+                records:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      local_id: { type: string }
+                      record_type: { type: string, enum: [gate_log, attendance_record, boarding_roll] }
+                      payload: { type: object }
+      responses:
+        '200': { description: Sync job queued }
+
+  /offline-sync/status:
+    get:
+      tags: [Offline Sync]
+      summary: Get sync status for device
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: device_id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Sync status }
+
+  # ══════════════════════════════════════════════════════════════
+  # FEES
+  # ══════════════════════════════════════════════════════════════
+  /fees/summary:
+    get:
+      tags: [Fees]
+      summary: Fees summary
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: term_id
+          in: query
+          schema: { type: string }
+        - name: academic_year_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: Fee summary }
+
+  /fees/students/{id}/balance:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Fees]
+      summary: Get student fee balance
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Balance object }
+
+  /fees/structures:
+    get:
+      tags: [Fees]
+      summary: List fee structures
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: academic_year_id
+          in: query
+          schema: { type: string }
+        - name: term_id
+          in: query
+          schema: { type: string }
+        - name: class_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: List of structures }
+    post:
+      tags: [Fees]
+      summary: Create fee structure
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FeeStructure' }
+      responses:
+        '201': { description: Structure created }
+
+  /fees/structures/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Fees]
+      summary: Get fee structure
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Fee structure }
+    patch:
+      tags: [Fees]
+      summary: Update fee structure
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Fees]
+      summary: Delete fee structure
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /fees/structures/{id}/clone:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    post:
+      tags: [Fees]
+      summary: Clone fee structure to another term
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [term_id, academic_year_id]
+              properties:
+                term_id: { type: string }
+                academic_year_id: { type: string }
+      responses:
+        '200': { description: Cloned structure }
+
+  /fees/assignments/bulk:
+    post:
+      tags: [Fees]
+      summary: Bulk assign fees to section
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fee_structure_id, section_id, academic_year_id, term_id]
+              properties:
+                fee_structure_id: { type: string }
+                section_id: { type: string }
+                academic_year_id: { type: string }
+                term_id: { type: string }
+                due_date: { type: string, format: date }
+      responses:
+        '200': { description: Bulk assignment summary }
+
+  /fees/assignments:
+    get:
+      tags: [Fees]
+      summary: List fee assignments
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: student_id
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [unpaid, partial, paid, waived, overdue] }
+      responses:
+        '200': { description: List of assignments }
+    post:
+      tags: [Fees]
+      summary: Create fee assignment
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, fee_structure_id, amount_due]
+              properties:
+                student_id: { type: string }
+                fee_structure_id: { type: string }
+                amount_due: { type: number }
+                due_date: { type: string, format: date }
+                waiver_reason: { type: string, nullable: true }
+      responses:
+        '201': { description: Assignment created }
+
+  /fees/assignments/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Fees]
+      summary: Get fee assignment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Assignment }
+    patch:
+      tags: [Fees]
+      summary: Update fee assignment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Fees]
+      summary: Delete fee assignment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /fees/transactions:
+    get:
+      tags: [Fees]
+      summary: List fee transactions
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: student_id
+          in: query
+          schema: { type: string }
+        - name: from_date
+          in: query
+          schema: { type: string, format: date }
+        - name: to_date
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: List of transactions }
+    post:
+      tags: [Fees]
+      summary: Create fee transaction (payment)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, fee_assignment_id, amount, payment_method, paid_at]
+              properties:
+                student_id: { type: string }
+                fee_assignment_id: { type: string }
+                amount: { type: number }
+                payment_method: { type: string, enum: [cash, mtn_momo, airtel_money, bank_transfer, cheque, other] }
+                payment_ref: { type: string }
+                paid_at: { type: string, format: date }
+                notes: { type: string }
+                currency: { type: string, example: RWF }
+      responses:
+        '201': { description: Transaction created }
+
+  /fees/transactions/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Fees]
+      summary: Get fee transaction
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Transaction }
+    patch:
+      tags: [Fees]
+      summary: Update fee transaction
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Fees]
+      summary: Delete fee transaction
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /fees/transactions/{id}/receipt:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    post:
+      tags: [Fees]
+      summary: Upload payment receipt
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                receipt:
+                  type: string
+                  format: binary
+      responses:
+        '200': { description: Transaction with receipt URL }
+
+  # ══════════════════════════════════════════════════════════════
+  # EXAMS
+  # ══════════════════════════════════════════════════════════════
+  /exams:
+    get:
+      tags: [Exams]
+      summary: List exams
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: section_id
+          in: query
+          schema: { type: string }
+        - name: term_id
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [scheduled, ongoing, completed, cancelled] }
+        - name: type
+          in: query
+          schema: { type: string, enum: [cat, main_exam, mock, quiz, assignment] }
+      responses:
+        '200': { description: List of exams }
+    post:
+      tags: [Exams]
+      summary: Create exam
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Exam' }
+      responses:
+        '201': { description: Exam created }
+
+  /exams/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Exams]
+      summary: Get exam
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Exam }
+    patch:
+      tags: [Exams]
+      summary: Update exam
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Exams]
+      summary: Delete exam
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /exam-results:
+    get:
+      tags: [Exams]
+      summary: List exam results
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: exam_id
+          in: query
+          schema: { type: string }
+        - name: student_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: List of results }
+    post:
+      tags: [Exams]
+      summary: Create exam result
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [exam_id, student_id]
+              properties:
+                exam_id: { type: string }
+                student_id: { type: string }
+                score: { type: number }
+                grade: { type: string }
+                remarks: { type: string }
+                is_absent: { type: boolean }
+      responses:
+        '201': { description: Result created }
+
+  /exam-results/bulk:
+    post:
+      tags: [Exams]
+      summary: Bulk submit exam results
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [exam_id, results]
+              properties:
+                exam_id: { type: string }
+                results:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      student_id: { type: string }
+                      score: { type: number }
+                      grade: { type: string }
+                      is_absent: { type: boolean }
+      responses:
+        '200': { description: Bulk summary }
+
+  /exam-results/summary/{examId}:
+    parameters:
+      - name: examId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Exams]
+      summary: Exam results summary
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Summary }
+
+  /exam-results/by-student/{studentId}:
+    parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Exams]
+      summary: Get results by student
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Results }
+
+  /exam-results/by-exam/{examId}:
+    parameters:
+      - name: examId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Exams]
+      summary: Get results by exam
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Results }
+
+  /exam-results/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Exams]
+      summary: Get exam result
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Result }
+    patch:
+      tags: [Exams]
+      summary: Update exam result
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Exams]
+      summary: Delete exam result
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # VISITORS
+  # ══════════════════════════════════════════════════════════════
+  /visitors:
+    get:
+      tags: [Visitors]
+      summary: List visitors
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: visitor_type
+          in: query
+          schema: { type: string, enum: [parent_guardian, organization] }
+      responses:
+        '200': { description: List of visitors }
+    post:
+      tags: [Visitors]
+      summary: Create visitor
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [full_name, visitor_type]
+              properties:
+                full_name: { type: string }
+                phone: { type: string }
+                email: { type: string }
+                national_id: { type: string }
+                organization: { type: string }
+                visitor_type: { type: string, enum: [parent_guardian, organization] }
+      responses:
+        '201': { description: Visitor created }
+
+  /visitors/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Visitors]
+      summary: Get visitor
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Visitor }
+    patch:
+      tags: [Visitors]
+      summary: Update visitor
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Visitors]
+      summary: Delete visitor
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /visitor-appointments:
+    get:
+      tags: [Visitors]
+      summary: List visitor appointments
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: visitor_id
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, confirmed, cancelled, completed] }
+      responses:
+        '200': { description: List of appointments }
+    post:
+      tags: [Visitors]
+      summary: Create visitor appointment
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [visitor_id, purpose, appointment_at]
+              properties:
+                visitor_id: { type: string }
+                student_id: { type: string }
+                host_id: { type: string }
+                purpose: { type: string, enum: [parent_visit, official_business, delivery, inspection, other] }
+                appointment_at: { type: string, format: date-time }
+                expected_duration_min: { type: integer }
+                notes: { type: string }
+      responses:
+        '201': { description: Appointment created }
+
+  /visitor-appointments/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Visitors]
+      summary: Get appointment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Appointment }
+    patch:
+      tags: [Visitors]
+      summary: Update appointment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Visitors]
+      summary: Delete appointment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /visitor-appointments/{id}/confirm:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    patch:
+      tags: [Visitors]
+      summary: Confirm appointment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Confirmed }
+
+  /visitor-appointments/{id}/cancel:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    patch:
+      tags: [Visitors]
+      summary: Cancel appointment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Cancelled }
+
+  /visitor-appointments/{id}/complete:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    patch:
+      tags: [Visitors]
+      summary: Complete appointment
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Completed }
+
+  /visitor-visits:
+    get:
+      tags: [Visitors]
+      summary: List visitor visits
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: visitor_id
+          in: query
+          schema: { type: string }
+        - name: active_only
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200': { description: List of visits }
+    post:
+      tags: [Visitors]
+      summary: Create visitor visit (check-in)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [visitor_id, purpose, checked_in_at]
+              properties:
+                visitor_id: { type: string }
+                appointment_id: { type: string }
+                student_id: { type: string }
+                host_id: { type: string }
+                purpose: { type: string }
+                checked_in_at: { type: string, format: date-time }
+                expected_out_at: { type: string, format: date-time }
+                notes: { type: string }
+                badge_printed: { type: boolean }
+                sms_sent_host: { type: boolean }
+      responses:
+        '201': { description: Visit created }
+
+  /visitor-visits/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Visitors]
+      summary: Get visit
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Visit }
+    patch:
+      tags: [Visitors]
+      summary: Update visit
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Visitors]
+      summary: Delete visit
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /visitor-visits/{id}/check-out:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    patch:
+      tags: [Visitors]
+      summary: Check out visitor
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Checked out }
+
+  # ══════════════════════════════════════════════════════════════
+  # DEVICES
+  # ══════════════════════════════════════════════════════════════
+  /devices:
+    get:
+      tags: [Devices]
+      summary: List devices
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: mode
+          in: query
+          schema: { type: string, enum: [gate, boarding, classroom] }
+        - name: type
+          in: query
+          schema: { type: string, enum: [tablet, kiosk, web] }
+        - name: is_active
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200': { description: List of devices }
+    post:
+      tags: [Devices]
+      summary: Register device
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_uid, name, type, mode]
+              properties:
+                device_uid: { type: string }
+                name: { type: string }
+                type: { type: string, enum: [tablet, kiosk, web] }
+                location: { type: string }
+                mode: { type: string, enum: [gate, boarding, classroom] }
+                pin: { type: string }
+                firmware_version: { type: string }
+      responses:
+        '201': { description: Device registered }
+
+  /devices/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Devices]
+      summary: Get device
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Device }
+    patch:
+      tags: [Devices]
+      summary: Update device
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Devices]
+      summary: Delete device
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /devices/{id}/deactivate:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    patch:
+      tags: [Devices]
+      summary: Deactivate device
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deactivated }
+
+  # ══════════════════════════════════════════════════════════════
+  # STAFF
+  # ══════════════════════════════════════════════════════════════
+  /staff/profiles:
+    get:
+      tags: [Staff]
+      summary: List staff profiles
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: department
+          in: query
+          schema: { type: string }
+        - name: employment_status
+          in: query
+          schema: { type: string, enum: [active, on_leave, inactive] }
+        - name: contract_type
+          in: query
+          schema: { type: string, enum: [permanent, contract, part_time] }
+      responses:
+        '200': { description: List of profiles }
+    post:
+      tags: [Staff]
+      summary: Create staff profile
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, staff_id_number, contract_type, join_date]
+              properties:
+                user_id: { type: string }
+                staff_id_number: { type: string }
+                gender: { type: string, enum: [male, female, other] }
+                department: { type: string }
+                contract_type: { type: string, enum: [permanent, contract, part_time] }
+                join_date: { type: string, format: date }
+                employment_status: { type: string, enum: [active, on_leave, inactive] }
+                subjects:
+                  type: array
+                  items: { type: string }
+      responses:
+        '201': { description: Profile created }
+
+  /staff/profiles/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Staff]
+      summary: Get staff profile
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Profile }
+    patch:
+      tags: [Staff]
+      summary: Update staff profile
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Staff]
+      summary: Delete staff profile
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /staff/leave-balances:
+    get:
+      tags: [Staff]
+      summary: List leave balances
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: staff_id
+          in: query
+          schema: { type: string }
+        - name: academic_year_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: List of balances }
+    post:
+      tags: [Staff]
+      summary: Create leave balance
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [staff_id, academic_year_id]
+              properties:
+                staff_id: { type: string }
+                academic_year_id: { type: string }
+                annual_days: { type: integer }
+                sick_days: { type: integer }
+                emergency_days: { type: integer }
+      responses:
+        '201': { description: Balance created }
+
+  /staff/leave-balances/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Staff]
+      summary: Get leave balance
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Balance }
+    patch:
+      tags: [Staff]
+      summary: Update leave balance
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Staff]
+      summary: Delete leave balance
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /staff/leave-balances/{id}/deduct:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    patch:
+      tags: [Staff]
+      summary: Deduct leave days
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [leave_type, days]
+              properties:
+                leave_type: { type: string, enum: [annual, sick, emergency] }
+                days: { type: integer }
+      responses:
+        '200': { description: Updated balance }
+
+  # ══════════════════════════════════════════════════════════════
+  # SALARY
+  # ══════════════════════════════════════════════════════════════
+  /salary-records:
+    get:
+      tags: [Salary]
+      summary: List salary records
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: staff_id
+          in: query
+          schema: { type: string }
+        - name: month
+          in: query
+          schema: { type: integer }
+        - name: year
+          in: query
+          schema: { type: integer }
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, paid, cancelled] }
+      responses:
+        '200': { description: List of salary records }
+    post:
+      tags: [Salary]
+      summary: Create salary record
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [staff_id, month, year, basic_salary, net_salary]
+              properties:
+                staff_id: { type: string }
+                month: { type: integer, minimum: 1, maximum: 12 }
+                year: { type: integer }
+                basic_salary: { type: number }
+                allowances: { type: number }
+                deductions: { type: number }
+                net_salary: { type: number }
+                notes: { type: string }
+      responses:
+        '201': { description: Record created }
+
+  /salary-records/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Salary]
+      summary: Get salary record
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Record }
+    patch:
+      tags: [Salary]
+      summary: Update salary record
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Salary]
+      summary: Delete salary record
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /salary-records/{id}/mark-paid:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    patch:
+      tags: [Salary]
+      summary: Mark salary as paid
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payment_method, paid_at]
+              properties:
+                payment_method: { type: string, enum: [cash, mtn_momo, airtel_money, bank_transfer, cheque, other] }
+                paid_at: { type: string, format: date }
+      responses:
+        '200': { description: Marked paid }
+
+  # ══════════════════════════════════════════════════════════════
+  # NOTIFICATIONS
+  # ══════════════════════════════════════════════════════════════
+  /notifications/send:
+    post:
+      tags: [Notifications]
+      summary: Send a notification
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channel, message]
+              properties:
+                channel: { type: string, enum: [sms, email, push, in_app] }
+                recipient_phone: { type: string }
+                message: { type: string }
+                template_id: { type: string, nullable: true }
+                variables: { type: object }
+                type: { type: string }
+      responses:
+        '200': { description: Send result }
+
+  /notifications/send-bulk:
+    post:
+      tags: [Notifications]
+      summary: Send bulk notifications
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipients]
+              properties:
+                template_id: { type: string }
+                variables: { type: object }
+                recipients:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      recipient_type: { type: string, enum: [parent, student, staff, admin] }
+                      recipient_id: { type: string }
+      responses:
+        '200': { description: Bulk send result }
+
+  /notifications/logs:
+    get:
+      tags: [Notifications]
+      summary: List notification logs
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [queued, sent, delivered, failed, retry] }
+        - name: channel
+          in: query
+          schema: { type: string, enum: [sms, email, push, in_app] }
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+      responses:
+        '200': { description: Notification logs }
+
+  /notifications/templates:
+    get:
+      tags: [Notifications]
+      summary: List notification templates
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/qParam' }
+        - name: is_active
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200': { description: List of templates }
+    post:
+      tags: [Notifications]
+      summary: Create notification template
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug, trigger_type, body_en]
+              properties:
+                name: { type: string }
+                slug: { type: string }
+                trigger_type: { type: string }
+                body_en: { type: string }
+                body_kin: { type: string, nullable: true }
+                variables: { type: object }
+                is_active: { type: boolean }
+      responses:
+        '201': { description: Template created }
+
+  /notifications/templates/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Notifications]
+      summary: Get template
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Template }
+    patch:
+      tags: [Notifications]
+      summary: Update template
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Notifications]
+      summary: Delete template
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /notifications/templates/{id}/render:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    post:
+      tags: [Notifications]
+      summary: Render template with variables
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                variables: { type: object }
+                language: { type: string, enum: [en, kin] }
+      responses:
+        '200': { description: Rendered message }
+
+  # ══════════════════════════════════════════════════════════════
+  # AUDIT LOGS
+  # ══════════════════════════════════════════════════════════════
+  /audit-logs:
+    get:
+      tags: [Audit Logs]
+      summary: List audit logs
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+        - name: actor_type
+          in: query
+          schema: { type: string, enum: [platform_user, school_user, system, api] }
+        - name: severity
+          in: query
+          schema: { type: string, enum: [info, warning, critical] }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: Audit log list }
+
+  # ══════════════════════════════════════════════════════════════
+  # SYSTEM SETTINGS
+  # ══════════════════════════════════════════════════════════════
+  /system-settings:
+    get:
+      tags: [System Settings]
+      summary: List system settings
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/qParam' }
+      responses:
+        '200': { description: List of settings }
+    post:
+      tags: [System Settings]
+      summary: Create system setting
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key_name, value, type]
+              properties:
+                key_name: { type: string }
+                value: { }
+                type: { type: string, enum: [string, integer, boolean, json] }
+      responses:
+        '201': { description: Setting created }
+
+  /system-settings/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [System Settings]
+      summary: Get setting by ID
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Setting }
+    patch:
+      tags: [System Settings]
+      summary: Update setting by ID
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [System Settings]
+      summary: Delete setting
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /system-settings/key/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [System Settings]
+      summary: Get setting by key name
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Setting }
+    patch:
+      tags: [System Settings]
+      summary: Update setting by key name
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value: { }
+                type: { type: string }
+      responses:
+        '200': { description: Updated }
+
+  # ══════════════════════════════════════════════════════════════
+  # PLATFORM — FEATURE FLAGS
+  # ══════════════════════════════════════════════════════════════
+  /feature-flags:
+    get:
+      tags: [Feature Flags]
+      summary: List feature flags
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+      responses:
+        '200': { description: List of feature flags }
+    post:
+      tags: [Feature Flags]
+      summary: Create feature flag
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key_name, label, is_enabled]
+              properties:
+                key_name: { type: string }
+                label: { type: string }
+                description: { type: string }
+                is_enabled: { type: boolean }
+                is_beta: { type: boolean }
+      responses:
+        '201': { description: Flag created }
+
+  /feature-flags/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Feature Flags]
+      summary: Get feature flag by ID
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Flag }
+    patch:
+      tags: [Feature Flags]
+      summary: Update feature flag
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Feature Flags]
+      summary: Delete feature flag
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /feature-flags/key/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Feature Flags]
+      summary: Get feature flag by key
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Flag }
+
+  # ══════════════════════════════════════════════════════════════
+  # PLATFORM — REVENUE
+  # ══════════════════════════════════════════════════════════════
+  /platform/revenue:
+    get:
+      tags: [Platform Revenue]
+      summary: Platform revenue summary
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: Revenue summary }
+
+  # ══════════════════════════════════════════════════════════════
+  # PLATFORM — SCHOOLS
+  # ══════════════════════════════════════════════════════════════
+  /platform/schools:
+    get:
+      tags: [Platform Schools]
+      summary: List schools (platform admin)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+        - { $ref: '#/components/parameters/qParam' }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, trial, grace, suspended, expired, cancelled] }
+        - name: province
+          in: query
+          schema: { type: string }
+        - name: school_type
+          in: query
+          schema: { type: string }
+        - name: has_boarding
+          in: query
+          schema: { type: boolean }
+        - { $ref: '#/components/parameters/includeDeletedParam' }
+      responses:
+        '200': { description: List of schools }
+    post:
+      tags: [Platform Schools]
+      summary: Create school
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlatformSchool' }
+      responses:
+        '201': { description: School created }
+
+  /platform/schools/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Platform Schools]
+      summary: Get school
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: School }
+    patch:
+      tags: [Platform Schools]
+      summary: Update school
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Platform Schools]
+      summary: Delete school
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # PLATFORM — PLANS
+  # ══════════════════════════════════════════════════════════════
+  /platform/plans:
+    get:
+      tags: [Platform Plans]
+      summary: List subscription plans
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: is_active
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200': { description: List of plans }
+    post:
+      tags: [Platform Plans]
+      summary: Create subscription plan
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, price_monthly, price_annual]
+              properties:
+                name: { type: string }
+                price_monthly: { type: number }
+                price_annual: { type: number }
+                student_limit: { type: integer }
+                staff_limit: { type: integer }
+                sms_bundle: { type: integer }
+                features: { type: array, items: { type: string } }
+                is_active: { type: boolean }
+                sort_order: { type: integer }
+      responses:
+        '201': { description: Plan created }
+
+  /platform/plans/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Platform Plans]
+      summary: Get plan
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Plan }
+    patch:
+      tags: [Platform Plans]
+      summary: Update plan
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Platform Plans]
+      summary: Delete plan
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # PLATFORM — SUBSCRIPTIONS
+  # ══════════════════════════════════════════════════════════════
+  /platform/subscriptions:
+    get:
+      tags: [Platform Subscriptions]
+      summary: List subscriptions
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: school_id
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, trial, grace, expired, cancelled, pending] }
+      responses:
+        '200': { description: List of subscriptions }
+    post:
+      tags: [Platform Subscriptions]
+      summary: Create subscription
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [school_id, plan_id, billing_cycle, amount, status, starts_at]
+              properties:
+                school_id: { type: string }
+                plan_id: { type: string }
+                billing_cycle: { type: string, enum: [monthly, annual, term, weekly, daily] }
+                amount: { type: number }
+                currency: { type: string }
+                status: { type: string }
+                starts_at: { type: string, format: date }
+                ends_at: { type: string, format: date }
+                auto_renew: { type: boolean }
+      responses:
+        '201': { description: Subscription created }
+
+  /platform/subscriptions/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Platform Subscriptions]
+      summary: Get subscription
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Subscription }
+    patch:
+      tags: [Platform Subscriptions]
+      summary: Update subscription
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Platform Subscriptions]
+      summary: Delete subscription
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # PLATFORM — INVOICES
+  # ══════════════════════════════════════════════════════════════
+  /platform/invoices:
+    get:
+      tags: [Platform Invoices]
+      summary: List platform invoices
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, issued, paid, overdue, void, refunded] }
+        - name: school_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: List of invoices }
+    post:
+      tags: [Platform Invoices]
+      summary: Create platform invoice
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invoice_number, school_id, total, currency, status]
+              properties:
+                invoice_number: { type: string }
+                school_id: { type: string }
+                subscription_id: { type: string }
+                period_start: { type: string, format: date }
+                period_end: { type: string, format: date }
+                issue_date: { type: string, format: date }
+                due_date: { type: string, format: date }
+                subtotal: { type: number }
+                tax_rate: { type: number }
+                tax_amount: { type: number }
+                discount_amount: { type: number }
+                total: { type: number }
+                currency: { type: string }
+                status: { type: string }
+                line_items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      description: { type: string }
+                      quantity: { type: number }
+                      unit_price: { type: number }
+                      total: { type: number }
+      responses:
+        '201': { description: Invoice created }
+
+  /platform/invoices/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Platform Invoices]
+      summary: Get invoice
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Invoice }
+    patch:
+      tags: [Platform Invoices]
+      summary: Update invoice
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Platform Invoices]
+      summary: Delete invoice
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # PLATFORM — USERS
+  # ══════════════════════════════════════════════════════════════
+  /platform/users:
+    get:
+      tags: [Platform Users]
+      summary: List platform users
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: role
+          in: query
+          schema: { type: string, enum: [platform_admin, support] }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, inactive, locked] }
+      responses:
+        '200': { description: List of platform users }
+    post:
+      tags: [Platform Users]
+      summary: Create platform user
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, role]
+              properties:
+                name: { type: string }
+                email: { type: string }
+                password: { type: string }
+                role: { type: string, enum: [platform_admin, support] }
+                access_scope: { type: string, enum: [all, assigned] }
+                permissions: { type: array, items: { type: string } }
+                status: { type: string, enum: [active, inactive, locked] }
+      responses:
+        '201': { description: Platform user created }
+
+  /platform/users/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Platform Users]
+      summary: Get platform user
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Platform user }
+    patch:
+      tags: [Platform Users]
+      summary: Update platform user
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Platform Users]
+      summary: Delete platform user
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # PLATFORM — ANNOUNCEMENTS
+  # ══════════════════════════════════════════════════════════════
+  /platform/announcements:
+    get:
+      tags: [Platform Announcements]
+      summary: List announcements
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, scheduled, sent] }
+        - name: type
+          in: query
+          schema: { type: string, enum: [info, warning, critical, maintenance, feature] }
+        - name: target_scope
+          in: query
+          schema: { type: string, enum: [all, plan, province, specific] }
+      responses:
+        '200': { description: List of announcements }
+    post:
+      tags: [Platform Announcements]
+      summary: Create announcement
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, body, type, target_scope, status]
+              properties:
+                title: { type: string }
+                body: { type: string }
+                type: { type: string, enum: [info, warning, critical, maintenance, feature] }
+                target_scope: { type: string, enum: [all, plan, province, specific] }
+                target_values: { nullable: true }
+                status: { type: string, enum: [draft, scheduled, sent] }
+                scheduled_at: { type: string, format: date-time }
+                send_inapp: { type: boolean }
+                send_email: { type: boolean }
+      responses:
+        '201': { description: Announcement created }
+
+  /platform/announcements/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Platform Announcements]
+      summary: Get announcement
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Announcement }
+    patch:
+      tags: [Platform Announcements]
+      summary: Update announcement
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Platform Announcements]
+      summary: Delete announcement
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /platform/announcements/{id}/read:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    post:
+      tags: [Platform Announcements]
+      summary: Mark announcement as read
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                school_id: { type: string }
+                user_id: { type: string }
+      responses:
+        '200': { description: Read marker created }
+
+  # ══════════════════════════════════════════════════════════════
+  # PLATFORM — SUPPORT TICKETS
+  # ══════════════════════════════════════════════════════════════
+  /platform/support-tickets:
+    get:
+      tags: [Support Tickets]
+      summary: List support tickets
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [open, in_progress, resolved, closed] }
+        - name: priority
+          in: query
+          schema: { type: string, enum: [low, medium, high, critical] }
+        - name: category
+          in: query
+          schema: { type: string, enum: [technical, billing, feature_request, other] }
+        - name: school_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: List of tickets }
+    post:
+      tags: [Support Tickets]
+      summary: Create support ticket
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [school_id, opened_by, subject, category, priority, status]
+              properties:
+                school_id: { type: string }
+                opened_by: { type: string }
+                assigned_to: { type: string }
+                subject: { type: string }
+                category: { type: string, enum: [technical, billing, feature_request, other] }
+                priority: { type: string, enum: [low, medium, high, critical] }
+                status: { type: string, enum: [open, in_progress, resolved, closed] }
+      responses:
+        '201': { description: Ticket created }
+
+  /platform/support-tickets/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Support Tickets]
+      summary: Get support ticket
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Ticket }
+    patch:
+      tags: [Support Tickets]
+      summary: Update support ticket
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Support Tickets]
+      summary: Delete support ticket
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  /platform/support-tickets/{id}/messages:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [Support Tickets]
+      summary: List ticket messages
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: List of messages }
+    post:
+      tags: [Support Tickets]
+      summary: Add ticket message
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sender_type, sender_id, body]
+              properties:
+                sender_type: { type: string, enum: [school_user, platform_user] }
+                sender_id: { type: string }
+                body: { type: string }
+                is_internal: { type: boolean }
+      responses:
+        '201': { description: Message created }
+
+  /platform/support-tickets/{id}/messages/{messageId}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+      - name: messageId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Support Tickets]
+      summary: Get ticket message
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Message }
+    patch:
+      tags: [Support Tickets]
+      summary: Update ticket message
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Support Tickets]
+      summary: Delete ticket message
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }
+
+  # ══════════════════════════════════════════════════════════════
+  # PLATFORM — SMS PROVIDERS
+  # ══════════════════════════════════════════════════════════════
+  /platform/sms-providers:
+    get:
+      tags: [SMS Providers]
+      summary: List SMS providers
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/pageParam' }
+        - { $ref: '#/components/parameters/limitParam' }
+      responses:
+        '200': { description: List of providers }
+    post:
+      tags: [SMS Providers]
+      summary: Create SMS provider
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug, sender_id]
+              properties:
+                name: { type: string }
+                slug: { type: string }
+                api_key_masked: { type: string }
+                sender_id: { type: string }
+                is_default: { type: boolean }
+                is_active: { type: boolean }
+                priority: { type: integer }
+                config: { type: object }
+      responses:
+        '201': { description: Provider created }
+
+  /platform/sms-providers/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/idPath' }
+    get:
+      tags: [SMS Providers]
+      summary: Get SMS provider
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Provider }
+    patch:
+      tags: [SMS Providers]
+      summary: Update SMS provider
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [SMS Providers]
+      summary: Delete SMS provider
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Deleted }

@@ -1,0 +1,891 @@
+Education Care Africa
+Director of Studies (DOS)
+Complete Functional & Technical Role Specification
+Document Type: Role & Functional Requirements Specification
+Module/Role: Director of Studies (DOS)
+System: School Management System
+Primary Domain: Academic Management, Teaching, Curriculum, Assessment & Academic Performance
+Version: 1.0
+Status: Development / Design Specification
+
+1. Purpose
+The Director of Studies (DOS) is the primary academic operational authority within the School Management System.
+The DOS is responsible for ensuring that:
+Teaching is properly organized
+Curriculum is implemented
+Teachers are academically coordinated
+Timetables are functioning
+Syllabus progress is monitored
+Student academic attendance is monitored
+Examinations are properly managed
+Assessment is controlled
+Results are processed
+Academic performance is monitored
+Academic intervention is initiated where required
+The DOS reports operationally to the Principal / Head Teacher.
+
+2. Role Philosophy
+The DOS's core question is:
+Is the academic system functioning correctly, are teachers delivering the required curriculum, and are students achieving the expected academic outcomes?
+The DOS is therefore the primary academic authority.
+The DOD is responsible for student discipline and operational welfare.
+These roles must remain separate.
+
+3. Reporting Hierarchy
+Recommended structure:
+Principal / Head Teacher
+↓
+Director of Studies (DOS)
+↓
+Academic Operations:
+Heads of Department
+Academic Coordinators
+Teachers
+Examination Staff
+Academic Support Staff
+The exact subordinate hierarchy may vary by school.
+
+4. DOS Core Responsibilities
+DOS should have responsibility for:
+Academic Planning
+Academic calendar
+Terms
+Academic targets
+Class structure
+Subject structure
+Academic programs
+Teaching Management
+Teacher subject assignment
+Teacher class assignment
+Teaching workload
+Academic teacher coordination
+Lesson planning
+Syllabus progress
+Timetable
+Class timetable
+Teacher timetable
+Subject periods
+Room scheduling
+Substitution
+Curriculum
+Curriculum
+Syllabus
+Scheme of work
+Topic progress
+Curriculum compliance
+Attendance
+Class attendance
+Subject attendance
+Period attendance
+Academic attendance analysis
+Examinations
+Exam schedules
+Exam rooms
+Invigilators
+Assessment
+Marks
+Results
+Performance
+Student performance
+Subject performance
+Teacher academic performance
+Class performance
+Academic risk
+
+5. DOS Dashboard
+The DOS dashboard should be academic-focused.
+Academic Overview
+Display:
+Total Students
+Total Teachers
+Active Classes
+Subjects
+Today's Classes
+Attendance Percentage
+Syllabus Completion
+Pending Marks
+Upcoming Exams
+Academic Risk Students
+
+6. Teaching Overview
+DOS should see:
+Teachers currently teaching
+Teachers absent
+Classes without teacher
+Timetable conflicts
+Free periods
+Substitution requirements
+Pending lesson plans
+Syllabus delays
+
+7. Academic Attendance
+DOS is the academic owner of student attendance.
+The system should support:
+Daily attendance
+Period attendance
+Subject attendance
+Class attendance
+Attendance percentage
+Attendance history
+Absence trends
+Late arrival
+Attendance exceptions
+
+8. Attendance Ownership
+The system must distinguish:
+Academic Attendance
+DOS / Academic Team
+Responsible for:
+Whether student attended class
+Whether teacher marked attendance
+Subject attendance
+Period attendance
+Academic attendance percentage
+Boarding Attendance
+DOD / Boarding Team
+Responsible for:
+Boarding presence
+Dormitory attendance
+Night attendance
+Boarding biometric attendance
+This distinction must be maintained technically.
+
+9. Attendance Escalation
+If a student repeatedly misses academic classes:
+System can generate:
+Academic Attendance Concern
+DOS receives the concern.
+DOS may:
+Review history
+Identify pattern
+Contact teacher
+Initiate academic intervention
+Refer to DOD if the issue becomes disciplinary
+
+10. DOS → DOD Referral
+When absence becomes a discipline issue:
+Example:
+Student repeatedly skips class
+↓
+DOS Academic Attendance Review
+↓
+Attendance Concern
+↓
+Refer to DOD
+DOD receives a disciplinary referral.
+DOD handles:
+Discipline investigation
+Student behaviour
+Parent discipline communication
+Disciplinary action
+The original academic attendance record remains under DOS.
+
+11. DOD → DOS Referral
+DOD may refer a student to DOS when a behavioural/welfare issue has academic impact.
+Example:
+Student has repeated behavioural incidents affecting classroom learning.
+DOD:
+Refer to DOS
+DOS may then initiate:
+Academic monitoring
+Teacher intervention
+Academic counselling
+Remedial support
+Performance review
+
+12. Academic Calendar
+DOS should manage:
+Academic year
+Terms
+Term dates
+Examination periods
+Assessment periods
+Academic activities
+Holidays from an academic scheduling perspective
+The system should maintain a centralized academic calendar.
+
+13. Class & Section Management
+DOS should have visibility/control according to school policy over:
+Classes
+Sections
+Subject offerings
+Academic streams
+Class capacity
+Academic grouping
+Student admission/registration should remain under the relevant Administration/Admissions role.
+DOS should manage the academic structure rather than duplicate student admission functionality.
+
+14. Subject Management
+DOS should manage academic subject assignment.
+Functions:
+Create subject
+Assign subject to class
+Assign subject to section
+Assign teacher
+Set subject periods
+Define subject requirements
+Monitor subject progress
+
+15. Teacher Academic Assignment
+DOS should be able to assign:
+Teacher → Subject → Class → Section
+Example:
+Mr. John → Mathematics → S5 → A
+The system should prevent invalid/conflicting assignments.
+
+16. Teacher Workload
+DOS dashboard should show:
+Teacher
+Subjects
+Classes
+Weekly periods
+Assigned workload
+Free periods
+Substitution requirements
+The system should flag:
+Overloaded teacher
+Underutilized teacher
+Timetable conflict
+
+17. Timetable Management
+DOS is the primary owner of academic timetabling.
+The system should support:
+Class timetable
+Teacher timetable
+Subject timetable
+Room timetable
+Periods
+Breaks
+Free periods
+Substitution
+
+18. Timetable Conflict Detection
+The system must automatically detect:
+Teacher Conflict
+Same teacher assigned to two classes at same time.
+Class Conflict
+Same class assigned two subjects at same time.
+Room Conflict
+Same room assigned to two classes at same time.
+The system should prevent publishing an invalid timetable unless an authorized override exists.
+
+19. Teacher Substitution
+When a teacher is unavailable:
+DOS should be able to:
+View affected classes
+Select substitute teacher
+Confirm substitution
+Notify teacher
+Update timetable/session record
+Substitution history must be retained.
+
+20. Curriculum Management
+DOS should manage the academic curriculum structure.
+Functions:
+Curriculum setup
+Subjects
+Topics
+Units
+Learning objectives
+Syllabus
+Academic targets
+The system should support curriculum by:
+Academic year
+Class
+Subject
+Term
+
+21. Syllabus Management
+DOS should be able to monitor:
+Total syllabus
+Completed topics
+Pending topics
+Expected progress
+Actual progress
+Delayed subjects
+Example:
+S4 Mathematics
+Expected:
+80%
+Actual:
+65%
+System:
+ACADEMIC PROGRESS DELAY
+
+22. Teacher Lesson Planning
+Depending on school policy, DOS should be able to:
+View lesson plans
+Review lesson plans
+Monitor submission
+Track lesson coverage
+Identify missing plans
+Teachers remain responsible for creating their own lesson plans.
+DOS is the academic supervisory authority.
+
+23. Academic Performance
+DOS should monitor:
+Student marks
+Subject marks
+Class averages
+Student ranking where applicable
+Pass/fail
+Grade distribution
+Weak subjects
+Strong subjects
+Academic trends
+
+24. Academic Risk
+The system should automatically identify students at academic risk based on configurable criteria.
+Possible rules:
+Low average
+Multiple failed subjects
+Repeated low assessments
+Poor attendance
+Declining performance
+Missing assignments
+Example:
+Academic Risk = TRUE
+The student appears in the DOS dashboard.
+
+25. Academic Intervention
+DOS should be able to initiate:
+Remedial class
+Extra lesson
+Teacher intervention
+Academic counselling
+Parent meeting
+Study plan
+Performance monitoring
+Intervention should have:
+Student
+Reason
+Action
+Responsible teacher
+Start date
+Review date
+Outcome
+
+26. Examination Management
+DOS should be the academic authority for examinations.
+Functions:
+Create examination
+Define examination period
+Schedule subjects
+Assign rooms
+Assign invigilators
+Publish timetable
+Monitor exam attendance
+Manage marks
+Monitor pending marks
+
+27. Examination Timetable
+The system should support:
+Examination
+Date
+Start time
+End time
+Subject
+Class
+Room
+Invigilator
+Conflict detection should apply.
+
+28. Invigilator Assignment
+DOS should be able to assign:
+Teacher → Examination → Room → Date/Time
+The system must detect:
+Teacher conflict
+Room conflict
+Overlapping assignments
+
+29. Marks Management
+DOS should have visibility/control according to school policy over:
+Marks entry
+Marks verification
+Missing marks
+Marks approval
+Result processing
+Teachers should remain responsible for entering marks where applicable.
+DOS should supervise the academic process.
+
+30. Result Processing
+DOS should be able to:
+Review results
+Verify results
+Identify failures
+Identify top performers
+Identify subject weaknesses
+Approve/publish results according to school policy
+The system should preserve result history.
+
+31. Academic Reports
+DOS should have:
+Student Reports
+Academic performance
+Attendance
+Assessment
+Examination
+Subject performance
+Class Reports
+Class average
+Subject average
+Attendance
+Pass/fail
+Performance trends
+Subject Reports
+Subject average
+Pass percentage
+Failure rate
+Teacher
+Syllabus completion
+Teacher Reports
+Teaching load
+Syllabus progress
+Lesson plan compliance
+Student performance
+Academic attendance
+
+32. Teacher Academic Performance
+DOS should monitor academic performance indicators such as:
+Syllabus completion
+Student performance
+Lesson planning
+Assessment completion
+Attendance marking
+Academic progress
+This should not replace HR performance management.
+HR remains responsible for employment-related matters.
+
+33. Academic Alerts
+DOS should receive alerts for:
+Low student performance
+Repeated class absence
+Syllabus delay
+Missing marks
+Teacher absence affecting classes
+Timetable conflict
+Missing lesson plans
+Poor subject performance
+Academic risk students
+
+34. Parent Communication – Academic
+DOS-related parent communication may include:
+Academic performance
+Examination results
+Academic intervention
+Attendance concerns
+Parent academic meetings
+Academic warnings
+The system should maintain communication history.
+
+35. Parent Meeting – Academic
+DOS should be able to create academic parent meetings.
+Information:
+Student
+Parent
+Reason
+Date
+Time
+Teacher
+Academic issue
+Meeting notes
+Follow-up
+If the meeting becomes disciplinary, it can be referred to DOD.
+
+36. Academic Meeting Management
+DOS may manage:
+Department meetings
+Academic staff meetings
+Subject meetings
+Examination meetings
+Curriculum meetings
+The exact meeting functionality may remain within the general School Management module.
+DOS receives additional academic-management capabilities.
+
+37. DOS Reports
+Required reports include:
+Academic
+Student performance
+Class performance
+Subject performance
+Academic risk
+Attendance
+Student attendance
+Class attendance
+Subject attendance
+Attendance percentage
+Chronic absenteeism
+Curriculum
+Syllabus completion
+Teacher progress
+Subject progress
+Examination
+Exam schedule
+Exam attendance
+Marks
+Results
+Pass/fail
+Teacher
+Teaching load
+Substitution
+Academic workload
+Lesson plan status
+
+38. DOS Permissions
+Recommended permissions:
+Function
+DOS
+View Students
+Full Academic Scope
+Student Academic Profile
+Full
+Student Discipline
+View
+Boarding
+View
+Boarding Leave
+View/No Approval
+Class Attendance
+Full Academic
+Boarding Attendance
+View
+Subjects
+Full Academic
+Curriculum
+Full
+Syllabus
+Full
+Timetable
+Full
+Teacher Academic Assignment
+Full
+Teacher HR Profile
+View/Restricted
+Exams
+Full
+Marks
+Full/Supervisory
+Results
+Full/Supervisory
+Academic Reports
+Full
+Discipline Action
+No
+Boarding Leave Approval
+No
+Gate Exit Authorization
+No
+Dormitory Assignment
+No
+Dining Timing
+No
+
+
+39. DOS Must Not Control
+Unless specifically authorized by the Principal/System Administrator, DOS should not own:
+Student discipline
+Disciplinary punishment
+Boarding
+Dormitory assignment
+Boarding leave approval
+Gate exit
+Student physical release
+Security operations
+Patron/Matron management
+Student behavioural disciplinary action
+Finance
+Payroll
+HR employment decisions
+The DOS may have visibility where academic coordination requires it.
+
+40. DOD/DOS Interaction
+The system must support controlled interaction between the two roles.
+Academic → Discipline
+Academic Concern
+↓
+DOS
+↓
+Refer to DOD
+Discipline → Academic
+Behaviour/Welfare Concern
+↓
+DOD
+↓
+Refer to DOS
+Each referral must create a record containing:
+Student
+Source role
+Destination role
+Reason
+Priority
+Date
+Notes
+Attachments
+Status
+Follow-up
+Closure
+
+41. Cross-Domain Student Profile
+Both DOD and DOS should be able to see a consolidated student profile, but with domain-specific permissions.
+DOS sees:
+Academic information
+Attendance
+Subjects
+Marks
+Results
+Academic interventions
+DOD sees:
+Discipline
+Boarding
+Leave
+Movement
+Behaviour
+Welfare alerts
+Both may see common information such as:
+Student identity
+Class
+Section
+Parent information
+Basic contact details
+Sensitive operational information should remain permission-controlled.
+
+42. Academic Attendance vs Boarding Attendance
+This distinction must be implemented at the data/model level.
+Academic Attendance
+Example:
+08:00 Mathematics
+Student:
+PRESENT
+Owner:
+DOS / Teacher
+Boarding Attendance
+Example:
+21:00 Boarding Check
+Student:
+PRESENT
+Owner:
+DOD / Patron/Matron
+These should not be treated as the same attendance session.
+
+43. Academic Escalation Example
+Teacher
+↓
+Student Absent
+↓
+System tracks attendance
+↓
+Repeated absence
+↓
+DOS Alert
+↓
+DOS reviews
+↓
+If academic issue:
+Academic Intervention
+If disciplinary pattern:
+Refer to DOD
+
+44. Performance Escalation Example
+Assessment
+↓
+Low marks
+↓
+System identifies:
+Academic Risk
+↓
+DOS
+↓
+Teacher Intervention
+↓
+Remedial Plan
+↓
+Review
+↓
+If still failing:
+Parent Academic Meeting
+↓
+Continued monitoring
+
+45. Audit Requirements
+All DOS actions must be audited.
+Examples:
+Timetable changes
+Teacher assignment
+Subject assignment
+Curriculum changes
+Syllabus changes
+Exam schedule changes
+Marks approval
+Result approval
+Academic intervention
+Academic referrals
+Audit must record:
+User
+Role
+Action
+Timestamp
+Previous value
+New value
+Reason where applicable
+
+46. Configuration
+DOS should have an Academic Configuration section containing:
+Academic
+Academic year
+Terms
+Classes
+Sections
+Subjects
+Curriculum
+Curriculum
+Syllabus
+Topics
+Targets
+Timetable
+Periods
+Breaks
+Rooms
+Teaching schedules
+Examination
+Exam types
+Grading rules
+Assessment periods
+Attendance
+Academic attendance rules
+Attendance thresholds
+Escalation thresholds
+
+47. DOS Main Menu
+Recommended:
+Dashboard
+Academic Calendar
+Classes & Sections
+Subjects
+Teachers / Academic Assignment
+Timetable
+Curriculum
+Syllabus / Progress
+Academic Attendance
+Assessments
+Examinations
+Marks
+Results
+Academic Performance
+Academic Risk
+Interventions
+Academic Meetings
+Reports
+Referrals
+Configuration
+Audit Logs
+Chat Room
+
+48. Development Acceptance Criteria
+The DOS role is complete when:
+DOS dashboard is available.
+DOS can monitor academic operations.
+DOS can manage academic calendar.
+DOS can manage subjects.
+DOS can assign teachers academically.
+DOS can manage academic timetable.
+Timetable conflicts are detected.
+DOS can manage curriculum.
+DOS can monitor syllabus progress.
+DOS can monitor academic attendance.
+Academic attendance is separate from boarding attendance.
+DOS can manage examinations.
+DOS can monitor marks.
+DOS can process/approve results according to policy.
+Academic risk students are identified.
+DOS can initiate academic interventions.
+DOS can create academic parent meetings.
+DOS can refer disciplinary concerns to DOD.
+DOD can refer academic concerns to DOS.
+DOS has academic reports.
+DOS actions are audited.
+DOS does not unintentionally receive DOD operational authority.
+
+49. Parent Communication & Chat Room
+DOS Parent Chat Room
+The DOS Portal shall include a dedicated Parent Communication / Chat Room feature integrated with the existing Parent Mobile Application.
+The existing Parent Mobile Application currently supports Teacher–Parent communication. This functionality should be extended to support Parent ↔ DOS communication while keeping the existing Teacher–Parent chat functionality unchanged.
+Communication Scope
+Parents should be able to communicate with the DOS regarding:
+Academic performance 
+Academic attendance 
+Examination 
+Results 
+Marks 
+Curriculum 
+Syllabus 
+Academic intervention 
+Teacher/subject academic matters 
+Academic meetings 
+General academic queries 
+DOS Chat Access
+The DOS should have a Chat Room section in the DOS portal.
+The DOS should be able to:
+View parent conversations 
+Reply to parents 
+Start conversations where permitted 
+Search conversations 
+Filter conversations by student 
+View complete conversation history 
+Send text messages 
+Send permitted attachments 
+Mark conversations as resolved 
+Reopen conversations 
+Escalate to Principal/Head Teacher 
+Refer discipline-related matters to DOD 
+Student-Based Conversation
+Every conversation must be linked to a student.
+Example:
+Student: Jane Doe
+Parent: Mr. XYZ
+Class: S4-B
+Academic Concern: Mathematics Performance
+This allows the DOS to communicate with the parent with the correct student context.
+Academic Record Integration
+Where applicable, the chat should provide links to relevant academic records.
+For example:
+Parent:
+"Why is my child's attendance low?"
+DOS should be able to open:
+Student → Academic Attendance → Attendance History
+Similarly:
+Chat → Examination Result
+or
+Chat → Academic Intervention
+DOS Conversation Notifications
+When a parent sends a message:
+Parent App → DOS Portal Notification
+The DOS should receive an unread message alert.
+When DOS replies:
+DOS Portal → Parent App Notification
+Cross-Department Referral
+If a parent raises a discipline/boarding matter through DOS chat:
+Parent → DOS
+DOS can select:
+Refer to DOD
+The system should create a referral while preserving the original conversation.
+Similarly, if DOD receives an academic matter:
+DOD → Refer to DOS
+Communication Audit
+The system should maintain:
+Sender 
+Receiver 
+Student 
+Message 
+Date/time 
+Attachments 
+Read/unread status 
+Related academic record 
+Referral status 
+Resolution status 
+
+
+50. Final DOS Definition
+The School Management System should treat the DOS as:
+The academic authority responsible for academic planning, curriculum, teaching coordination, teacher academic assignments, timetabling, academic attendance, assessment, examinations, results, student academic performance, syllabus monitoring, and academic intervention.
+The DOS should work in coordination with the Principal, DOD, teachers, parents, administration, and other departments while maintaining clear ownership of academic operations.
+The DOS role must strengthen the existing School Management System and must not replace or modify unrelated roles and functionality.

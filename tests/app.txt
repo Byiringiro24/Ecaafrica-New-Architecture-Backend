@@ -1,0 +1,37 @@
+109.205.183.18
+
+
+
+
+
+changes 
+
+
+hiden 
+^admin dashboard
+
+MRR
+
+RWF 30,070.833
+
+Uptime
+
+99.8%
+
+SMS (mo)
+
+0
+
+New schools
+
++0
+
+Support
+
+3
+===================================================================================
+On dashboard
+hidden
+|>Platform Users
+|>Subscriptions & Billing
+|>

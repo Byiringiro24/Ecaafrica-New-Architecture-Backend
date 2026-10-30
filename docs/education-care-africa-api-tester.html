@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Education Care Africa — API Tester</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #21262d;
+    --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+    --green: #3fb950; --red: #f85149; --blue: #58a6ff;
+    --yellow: #d29922; --orange: #db6d28; --purple: #bc8cff;
+    --cyan: #39d0d8; --brand: #1f6feb;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
+
+  /* Layout */
+  .app { display:grid; grid-template-columns:290px 1fr; height:100vh; }
+  .sidebar { background:var(--surface); border-right:1px solid var(--border); overflow-y:auto; padding:0 0 24px; }
+  .sidebar-header { padding:16px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); z-index:10; }
+  .sidebar-header .logo { font-size:14px; font-weight:700; color:var(--cyan); letter-spacing:.3px; }
+  .sidebar-header .sub { font-size:11px; color:var(--muted); margin-top:2px; }
+  .main { display:flex; flex-direction:column; overflow:hidden; }
+  .toolbar { background:var(--surface); border-bottom:1px solid var(--border); padding:10px 20px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .content { flex:1; overflow-y:auto; padding:20px; }
+
+  /* Sidebar nav */
+  .nav-section { padding:10px 16px 4px; font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); font-weight:700; }
+  .nav-group { margin-bottom:2px; }
+  .nav-group-title { padding:5px 12px; font-size:12px; color:var(--muted); font-weight:600; cursor:pointer; user-select:none;
+    display:flex; justify-content:space-between; align-items:center; border-radius:4px; margin:0 4px; }
+  .nav-group-title:hover { background:var(--surface2); color:var(--text); }
+  .nav-group-title .arrow { transition:transform .2s; font-size:10px; }
+  .nav-group.collapsed .nav-items { display:none; }
+  .nav-group.collapsed .arrow { transform:rotate(-90deg); }
+  .nav-item { padding:4px 12px 4px 28px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:6px; border-radius:4px; margin:0 4px; }
+  .nav-item:hover { background:var(--surface2); }
+  .nav-item.active { background:var(--brand); color:#fff; }
+  .method-tag { font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; min-width:40px; text-align:center; flex-shrink:0; }
+  .method-GET    .method-tag { background:#3fb95022; color:var(--green); }
+  .method-POST   .method-tag { background:#58a6ff22; color:var(--blue); }
+  .method-PATCH  .method-tag { background:#db6d2822; color:var(--orange); }
+  .method-DELETE .method-tag { background:#f8514922; color:var(--red); }
+
+  /* Toolbar */
+  .toolbar label { font-size:11px; color:var(--muted); }
+  .toolbar input, .toolbar select { background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:4px; font-size:12px; }
+  .toolbar input#baseUrl { width:300px; }
+  .btn { padding:6px 14px; border:none; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; transition:opacity .2s; white-space:nowrap; }
+  .btn:hover { opacity:.85; }
+  .btn-primary { background:var(--brand); color:#fff; }
+  .btn-green  { background:var(--green); color:#000; }
+  .btn-red    { background:var(--red); color:#fff; }
+  .btn-yellow { background:var(--yellow); color:#000; }
+  .btn-purple { background:var(--purple); color:#000; }
+  .btn-cyan   { background:var(--cyan); color:#000; }
+  .btn-sm { padding:3px 9px; font-size:11px; }
+  .token-display { font-size:11px; color:var(--green); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .token-display.none { color:var(--red); }
+
+  /* Test cards */
+  .test-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; overflow:hidden; }
+  .test-header { padding:10px 14px; display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+  .test-header:hover { background:var(--surface2); }
+  .test-title { flex:1; font-size:12px; font-weight:600; }
+  .test-status { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; }
+  .status-pending  { background:#58a6ff22; color:var(--blue); }
+  .status-running  { background:#d2992222; color:var(--yellow); }
+  .status-pass     { background:#3fb95022; color:var(--green); }
+  .status-fail     { background:#f8514922; color:var(--red); }
+  .status-skip     { background:#8b949e22; color:var(--muted); }
+  .test-body { border-top:1px solid var(--border); padding:12px 14px; display:none; }
+  .test-card.open .test-body { display:block; }
+  .test-section { margin-bottom:10px; }
+  .test-section-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+  pre.json { background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:10px; font-size:11px; overflow-x:auto; max-height:320px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; }
+  .time { font-size:10px; color:var(--muted); }
+
+  /* Progress */
+  .progress-bar { height:3px; background:var(--border); border-radius:2px; overflow:hidden; flex:1; max-width:180px; }
+  .progress-fill { height:100%; background:var(--green); transition:width .3s; }
+  .stats { font-size:11px; display:flex; gap:10px; }
+  .stats span { display:flex; align-items:center; gap:4px; }
+  .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+  .dot-pass { background:var(--green); } .dot-fail { background:var(--red); } .dot-skip { background:var(--muted); }
+
+  /* Auth panel */
+  .auth-panel { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:16px 20px; margin-bottom:14px; }
+  .auth-panel h3 { font-size:14px; margin-bottom:12px; color:var(--cyan); }
+  .auth-tabs { display:flex; gap:8px; margin-bottom:12px; }
+  .auth-tab { padding:4px 12px; border-radius:4px; font-size:12px; cursor:pointer; border:1px solid var(--border); color:var(--muted); background:transparent; }
+  .auth-tab.active { border-color:var(--brand); color:var(--blue); background:#1f6feb22; }
+  .auth-section { display:none; }
+  .auth-section.active { display:block; }
+  .form-row { display:flex; gap:10px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+  .form-row label { font-size:11px; color:var(--muted); min-width:70px; }
+  .form-row input, .form-row select { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:4px; font-size:12px; }
+  .form-row input { width:230px; }
+  .form-row input::placeholder { color:var(--muted); }
+  .login-status { font-size:11px; padding:4px 8px; border-radius:4px; margin-top:6px; display:none; }
+  .login-status.ok { background:#3fb95022; color:var(--green); }
+  .login-status.err { background:#f8514922; color:var(--red); }
+  .token-manual-input { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:4px; font-size:11px; width:100%; font-family:monospace; }
+  .token-actions { display:flex; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap; }
+
+  /* Banner */
+  .banner { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 18px; margin-bottom:14px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .banner strong { font-size:13px; }
+  .banner p { font-size:12px; color:var(--muted); margin-top:2px; }
+
+  /* Group header */
+  .group-header { font-size:12px; font-weight:700; color:var(--cyan); text-transform:uppercase; letter-spacing:.8px; padding:10px 0 6px; margin-top:8px; border-bottom:1px solid var(--border); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+  .group-count { font-size:10px; font-weight:400; color:var(--muted); text-transform:none; letter-spacing:0; }
+
+  ::-webkit-scrollbar { width:5px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">🎓 Education Care Africa</div>
+    <div class="sub">Backend API Test Suite</div>
+  </div>
+  <div id="nav"></div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="toolbar">
+    <label>Base URL</label>
+    <input id="baseUrl" value="http://localhost:5000/api/v1" />
+    <button class="btn btn-green" onclick="runAll()">▶ Run All</button>
+    <button class="btn btn-yellow" onclick="promptRunGroup()">▶ Run Group</button>
+    <button class="btn btn-red btn-sm" onclick="resetAll()">✕ Reset</button>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="stats" id="stats"></div>
+    <span class="token-display none" id="tokenDisplay">No token</span>
+  </div>
+
+  <div class="content" id="content">
+    <!-- Auth Panel -->
+    <div class="auth-panel">
+      <h3>🔐 Authentication</h3>
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="switchTab(event, 'school')">School Login</button>
+        <button class="auth-tab" onclick="switchTab(event, 'platform')">Platform Login</button>
+        <button class="auth-tab" onclick="switchTab(event, 'manual')">Paste Token</button>
+      </div>
+
+      <!-- School Login -->
+      <div class="auth-section active" id="tab-school">
+        <div class="form-row">
+          <label>Email</label>
+          <input id="schoolEmail" placeholder="admin@school.test" value="admin@school.test" />
+        </div>
+        <div class="form-row">
+          <label>Password</label>
+          <input id="schoolPassword" type="password" placeholder="password123" value="password123" />
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          <button class="btn btn-green btn-sm" onclick="quickLogin('school')">🔑 School Login</button>
+          <button class="btn btn-red btn-sm" onclick="clearToken('school')">✕ Clear Token</button>
+        </div>
+      </div>
+
+      <!-- Platform Login -->
+      <div class="auth-section" id="tab-platform">
+        <div class="form-row">
+          <label>Email</label>
+          <input id="platformEmail" placeholder="admin@platform.test" value="admin@platform.test" />
+        </div>
+        <div class="form-row">
+          <label>Password</label>
+          <input id="platformPassword" type="password" placeholder="password123" value="password123" />
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          <button class="btn btn-cyan btn-sm" onclick="quickLogin('platform')">🔑 Platform Login</button>
+          <button class="btn btn-red btn-sm" onclick="clearToken('platform')">✕ Clear Token</button>
+        </div>
+      </div>
+
+      <!-- Manual Token -->
+      <div class="auth-section" id="tab-manual">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Paste a JWT access token below (school or platform):</div>
+        <div class="form-row">
+          <label>Token Type</label>
+          <select id="manualTokenType">
+            <option value="school">School</option>
+            <option value="platform">Platform</option>
+          </select>
+        </div>
+        <input class="token-manual-input" id="manualToken" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+        <div class="token-actions">
+          <button class="btn btn-primary btn-sm" onclick="applyManualToken()">Apply Token</button>
+          <span style="font-size:11px;color:var(--muted)" id="tokenInfo">No token set</span>
+        </div>
+      </div>
+
+      <div class="login-status" id="loginStatus"></div>
+    </div>
+
+    <!-- Banner -->
+    <div class="banner">
+      <div>
+        <strong>Education Care Africa — Full API Test Suite</strong>
+        <p>Login above to get a token, then click <b>Run All</b> to execute all tests sequentially. IDs are captured automatically between tests.</p>
+      </div>
+    </div>
+
+    <div id="results"></div>
+  </div>
+</div>
+
+</div><!-- /.app -->
+
+<script>
+// ============================================================
+// STATE — IDs captured during test runs
+// ============================================================
+const S = {
+  token: '', refreshToken: '', userId: '',
+  platformToken: '', platformRefreshToken: '', platformAdminId: '',
+  // school endpoints
+  roleId: '', academicYearId: '', termId: '', classId: '', sectionId: '',
+  subjectId: '', teacherSectionSubjectId: '', timetablePeriodId: '', timetableSlotId: '',
+  holidayId: '', studentId: '', parentId: '', enrollmentId: '', biometricId: '',
+  attendanceSessionId: '', attendanceRecordId: '', gateLogId: '',
+  dormitoryId: '', roomId: '', boardingAssignmentId: '', rollCallId: '',
+  studentLeaveId: '', absenceAlertId: '', feeStructureId: '', feeAssignmentId: '',
+  feeTransactionId: '', examId: '', examResultId: '', visitorId: '', visitorAppointmentId: '',
+  visitorVisitId: '', deviceId: '', staffProfileId: '', leaveBalanceId: '', salaryRecordId: '',
+  notificationTemplateId: '',
+  // platform endpoints
+  featureFlagId: '', systemSettingId: '', platformSchoolId: '', platformPlanId: '',
+  platformSubscriptionId: '', platformInvoiceId: '', platformUserId: '',
+  announcementId: '', supportTicketId: '', ticketMessageId: '', smsProviderId: '',
+};
+
+const ts = () => Date.now().toString(36);
+const BASE = () => document.getElementById('baseUrl').value.replace(/\/+$/,'');
+
+function getAuthToken(auth) {
+  if (auth === 'platform') return S.platformToken;
+  if (auth === 'school' || auth === true) return S.token;
+  return '';
+}
+
+function resetState(options = {}) {
+  const keepTokens = options.keepTokens !== false;
+  const cached = {
+    token: S.token,
+    refreshToken: S.refreshToken,
+    platformToken: S.platformToken,
+    platformRefreshToken: S.platformRefreshToken,
+    userId: S.userId,
+    platformAdminId: S.platformAdminId,
+  };
+
+  Object.keys(S).forEach(k => { S[k] = ''; });
+
+  if (keepTokens) {
+    S.token = cached.token;
+    S.refreshToken = cached.refreshToken;
+    S.platformToken = cached.platformToken;
+    S.platformRefreshToken = cached.platformRefreshToken;
+    S.userId = cached.userId;
+    S.platformAdminId = cached.platformAdminId;
+  }
+
+  saveTokenToStorage();
+  updateTokenDisplay();
+}
+
+// ============================================================
+// TEST DEFINITIONS
+// ============================================================
+const TESTS = [
+
+  // ─── AUTH ────────────────────────────────────────────────
+  { group:'Auth', name:'School Login', method:'POST', path:'/auth/login',
+    body: () => ({ email: document.getElementById('schoolEmail').value || 'admin@school.test', password: document.getElementById('schoolPassword').value || 'password123' }),
+    capture: r => { S.token = r.data?.accessToken; S.refreshToken = r.data?.refreshToken; S.userId = r.data?.user?.id; saveTokenToStorage(); }},
+  { group:'Auth', name:'Get Current User (me)', method:'GET', path:'/auth/me', auth:true },
+  { group:'Auth', name:'Refresh Token', method:'POST', path:'/auth/refresh',
+    body: () => ({ refreshToken: S.refreshToken }),
+    capture: r => { S.token = r.data?.accessToken; S.refreshToken = r.data?.refreshToken; saveTokenToStorage(); }},
+  { group:'Auth', name:'Forgot Password', method:'POST', path:'/auth/forgot-password',
+    body: () => ({ email: 'admin@school.test' })},
+  { group:'Auth', name:'Platform Login', method:'POST', path:'/auth/platform/login',
+    body: () => ({ email: document.getElementById('platformEmail').value || 'admin@platform.test', password: document.getElementById('platformPassword').value || 'password123' }),
+    capture: r => { S.platformToken = r.data?.accessToken; S.platformRefreshToken = r.data?.refreshToken; S.platformAdminId = r.data?.user?.id || S.platformAdminId; saveTokenToStorage(); }},
+  { group:'Auth', name:'Logout', method:'POST', path:'/auth/logout', auth:true, defer:true,
+    body: () => ({ refreshToken: S.refreshToken })},
+
+  // ─── ROLES ───────────────────────────────────────────────
+  { group:'Roles', name:'List Roles', method:'GET', path:'/roles', auth:true },
+  { group:'Roles', name:'Create Role', method:'POST', path:'/roles', auth:true,
+    body: () => ({ name:`Role_${ts()}`, slug:`role_${ts()}`, permissions:['students:view'], is_system:false }),
+    capture: r => { S.roleId = r.data?.id; }},
+  { group:'Roles', name:'Get Role', method:'GET', path: () => `/roles/${S.roleId}`, auth:true, skip: () => !S.roleId },
+  { group:'Roles', name:'Update Role', method:'PATCH', path: () => `/roles/${S.roleId}`, auth:true,
+    body: () => ({ permissions:['students:view','users:view'] }), skip: () => !S.roleId },
+  { group:'Roles', name:'Delete Role', method:'DELETE', path: () => `/roles/${S.roleId}`, auth:true, skip: () => !S.roleId },
+
+  // ─── USERS ───────────────────────────────────────────────
+  { group:'Users', name:'List Users', method:'GET', path:'/users?page=1&limit=20', auth:true },
+  { group:'Users', name:'Create User', method:'POST', path:'/users', auth:true,
+    body: () => ({ name:'Test Teacher', email:`teacher_${ts()}@school.test`, phone:'+250700000099', role:'teacher', status:'active', password:'StrongPass123' }),
+    capture: r => { S.userId = S.userId || r.data?.id; }},
+  { group:'Users', name:'Get User', method:'GET', path: () => `/users/${S.userId}`, auth:true, skip: () => !S.userId },
+  { group:'Users', name:'Update User', method:'PATCH', path: () => `/users/${S.userId}`, auth:true,
+    body: () => ({ name:'Updated Teacher' }), skip: () => !S.userId },
+  { group:'Users', name:'Assign Role to User', method:'POST', path: () => `/users/${S.userId}/roles`, auth:true,
+    body: () => ({ role_id: S.roleId || '1' }), skip: () => !S.userId },
+
+  // ─── ACADEMIC YEARS ──────────────────────────────────────
+  { group:'Academic Years', name:'List Academic Years', method:'GET', path:'/academic-years', auth:true },
+  { group:'Academic Years', name:'Create Academic Year', method:'POST', path:'/academic-years', auth:true,
+    body: () => ({ name:'2025/2026', start_date:'2025-09-01', end_date:'2026-07-31', is_current:true }),
+    capture: r => { S.academicYearId = r.data?.id; }},
+  { group:'Academic Years', name:'Get Academic Year', method:'GET', path: () => `/academic-years/${S.academicYearId}`, auth:true, skip: () => !S.academicYearId },
+  { group:'Academic Years', name:'Update Academic Year', method:'PATCH', path: () => `/academic-years/${S.academicYearId}`, auth:true,
+    body: () => ({ name:'2025/2026 Updated' }), skip: () => !S.academicYearId },
+
+  // ─── TERMS ───────────────────────────────────────────────
+  { group:'Terms', name:'List Terms', method:'GET', path:'/terms', auth:true },
+  { group:'Terms', name:'Create Term', method:'POST', path:'/terms', auth:true,
+    body: () => ({ academic_year_id: S.academicYearId||'1', name:'Term 1', start_date:'2025-09-01', end_date:'2025-12-20', is_current:true }),
+    capture: r => { S.termId = r.data?.id; }},
+  { group:'Terms', name:'Get Term', method:'GET', path: () => `/terms/${S.termId}`, auth:true, skip: () => !S.termId },
+  { group:'Terms', name:'Update Term', method:'PATCH', path: () => `/terms/${S.termId}`, auth:true,
+    body: () => ({ name:'Term 1 Updated' }), skip: () => !S.termId },
+
+  // ─── CLASSES ─────────────────────────────────────────────
+  { group:'Classes', name:'List Classes', method:'GET', path:'/classes', auth:true },
+  { group:'Classes', name:'Create Class', method:'POST', path:'/classes', auth:true,
+    body: () => ({ name:'S1', level:1, description:'Senior One', academic_year_id: S.academicYearId||'1' }),
+    capture: r => { S.classId = r.data?.id; }},
+  { group:'Classes', name:'Get Class', method:'GET', path: () => `/classes/${S.classId}`, auth:true, skip: () => !S.classId },
+  { group:'Classes', name:'Update Class', method:'PATCH', path: () => `/classes/${S.classId}`, auth:true,
+    body: () => ({ description:'Senior One - Updated' }), skip: () => !S.classId },
+
+  // ─── SECTIONS ────────────────────────────────────────────
+  { group:'Sections', name:'List Sections', method:'GET', path:'/sections', auth:true },
+  { group:'Sections', name:'Create Section', method:'POST', path:'/sections', auth:true,
+    body: () => ({ class_id: S.classId||'1', name:'A', full_name:'S1 A', capacity:40, room:'Block A' }),
+    capture: r => { S.sectionId = r.data?.id; }},
+  { group:'Sections', name:'Get Section', method:'GET', path: () => `/sections/${S.sectionId}`, auth:true, skip: () => !S.sectionId },
+  { group:'Sections', name:'Update Section', method:'PATCH', path: () => `/sections/${S.sectionId}`, auth:true,
+    body: () => ({ capacity:45 }), skip: () => !S.sectionId },
+
+  // ─── SUBJECTS ────────────────────────────────────────────
+  { group:'Subjects', name:'List Subjects', method:'GET', path:'/subjects', auth:true },
+  { group:'Subjects', name:'Create Subject', method:'POST', path:'/subjects', auth:true,
+    body: () => ({ name:'Mathematics', code:`MATH_${ts()}`, description:'Core mathematics' }),
+    capture: r => { S.subjectId = r.data?.id; }},
+  { group:'Subjects', name:'Get Subject', method:'GET', path: () => `/subjects/${S.subjectId}`, auth:true, skip: () => !S.subjectId },
+  { group:'Subjects', name:'Update Subject', method:'PATCH', path: () => `/subjects/${S.subjectId}`, auth:true,
+    body: () => ({ description:'Core mathematics - Updated' }), skip: () => !S.subjectId },
+
+  // ─── TEACHER SECTION SUBJECTS ────────────────────────────
+  { group:'Teacher Assignments', name:'List Teacher Assignments', method:'GET', path:'/teacher-section-subjects', auth:true },
+  { group:'Teacher Assignments', name:'Create Assignment', method:'POST', path:'/teacher-section-subjects', auth:true,
+    body: () => ({ teacher_id: S.userId||'1', section_id: S.sectionId||'1', subject_id: S.subjectId||'1', term_id: S.termId||'1' }),
+    capture: r => { S.teacherSectionSubjectId = r.data?.id; }},
+  { group:'Teacher Assignments', name:'Get Assignment', method:'GET', path: () => `/teacher-section-subjects/${S.teacherSectionSubjectId}`, auth:true, skip: () => !S.teacherSectionSubjectId },
+  { group:'Teacher Assignments', name:'Update Assignment', method:'PATCH', path: () => `/teacher-section-subjects/${S.teacherSectionSubjectId}`, auth:true,
+    body: () => ({ term_id: S.termId||'1' }), skip: () => !S.teacherSectionSubjectId },
+
+  // ─── TIMETABLE PERIODS ───────────────────────────────────
+  { group:'Timetable', name:'List Timetable Periods', method:'GET', path:'/timetable-periods', auth:true },
+  { group:'Timetable', name:'Create Timetable Period', method:'POST', path:'/timetable-periods', auth:true,
+    body: () => ({ name:'Period 1', start_time:'08:00', end_time:'08:45', is_break:false, sort_order:1 }),
+    capture: r => { S.timetablePeriodId = r.data?.id; }},
+  { group:'Timetable', name:'Get Timetable Period', method:'GET', path: () => `/timetable-periods/${S.timetablePeriodId}`, auth:true, skip: () => !S.timetablePeriodId },
+  { group:'Timetable', name:'List Timetable Slots', method:'GET', path:'/timetable-slots', auth:true },
+  { group:'Timetable', name:'Create Timetable Slot', method:'POST', path:'/timetable-slots', auth:true,
+    body: () => ({ section_id: S.sectionId||'1', subject_id: S.subjectId||'1', teacher_id: S.userId||'1', period_id: S.timetablePeriodId||'1', day_of_week:1, room:'Lab 1', term_id: S.termId||'1' }),
+    capture: r => { S.timetableSlotId = r.data?.id; }},
+  { group:'Timetable', name:'Get Timetable Slot', method:'GET', path: () => `/timetable-slots/${S.timetableSlotId}`, auth:true, skip: () => !S.timetableSlotId },
+
+  // ─── HOLIDAYS ────────────────────────────────────────────
+  { group:'Holidays', name:'List Holidays', method:'GET', path:'/holidays', auth:true },
+  { group:'Holidays', name:'Create Holiday', method:'POST', path:'/holidays', auth:true,
+    body: () => ({ name:'National Day', start_date:'2025-07-01', end_date:'2025-07-01', type:'national' }),
+    capture: r => { S.holidayId = r.data?.id; }},
+  { group:'Holidays', name:'Get Holiday', method:'GET', path: () => `/holidays/${S.holidayId}`, auth:true, skip: () => !S.holidayId },
+  { group:'Holidays', name:'Update Holiday', method:'PATCH', path: () => `/holidays/${S.holidayId}`, auth:true,
+    body: () => ({ name:'National Day - Updated' }), skip: () => !S.holidayId },
+
+  // ─── STUDENTS ────────────────────────────────────────────
+  { group:'Students', name:'List Students', method:'GET', path:'/students?page=1&limit=20', auth:true },
+  { group:'Students', name:'Create Student', method:'POST', path:'/students', auth:true,
+    body: () => ({ student_id_number:`S-${ts()}`, first_name:'Alice', last_name:'Uwimana', other_names:'Grace',
+      date_of_birth:'2010-05-12', gender:'female', nationality:'Rwanda', admission_date:'2024-09-01',
+      enrollment_year:2024, student_type:'boarding', status:'active' }),
+    capture: r => { S.studentId = r.data?.id; }},
+  { group:'Students', name:'Get Student', method:'GET', path: () => `/students/${S.studentId}`, auth:true, skip: () => !S.studentId },
+  { group:'Students', name:'Update Student', method:'PATCH', path: () => `/students/${S.studentId}`, auth:true,
+    body: () => ({ address:'Kigali, Gasabo' }), skip: () => !S.studentId },
+  { group:'Students', name:'Enroll Student', method:'POST', path: () => `/students/${S.studentId}/enrollments`, auth:true,
+    body: () => ({ section_id: S.sectionId||'1', academic_year_id: S.academicYearId||'1', term_id: S.termId||'1', enrolled_at:'2025-09-01', status:'active' }),
+    capture: r => { S.enrollmentId = r.data?.id; }, skip: () => !S.studentId },
+  { group:'Students', name:'Get Student Enrollments', method:'GET', path: () => `/students/${S.studentId}/enrollments`, auth:true, skip: () => !S.studentId },
+
+  // ─── PARENTS ─────────────────────────────────────────────
+  { group:'Parents', name:'List Parents', method:'GET', path:'/parents', auth:true },
+  { group:'Parents', name:'Create Parent', method:'POST', path:'/parents', auth:true,
+    body: () => ({ first_name:'John', last_name:'Doe', phone:`+25070000${ts().slice(-4)}`, email:`parent_${ts()}@home.test`, relationship:'Father', address:'Kigali', occupation:'Engineer' }),
+    capture: r => { S.parentId = r.data?.id; }},
+  { group:'Parents', name:'Get Parent', method:'GET', path: () => `/parents/${S.parentId}`, auth:true, skip: () => !S.parentId },
+  { group:'Parents', name:'Update Parent', method:'PATCH', path: () => `/parents/${S.parentId}`, auth:true,
+    body: () => ({ occupation:'Senior Engineer' }), skip: () => !S.parentId },
+  { group:'Parents', name:'Link Parent to Student', method:'POST', path: () => `/students/${S.studentId}/parents`, auth:true,
+    body: () => ({ parent_id: S.parentId, is_primary:true }), skip: () => !S.studentId || !S.parentId },
+
+  // ─── BIOMETRICS ──────────────────────────────────────────
+  { group:'Biometrics', name:'List Biometric Enrollments', method:'GET', path:'/biometric-enrollments', auth:true },
+  { group:'Biometrics', name:'Create Biometric Enrollment', method:'POST', path:'/biometric-enrollments', auth:true,
+    body: () => ({ student_id: S.studentId||'1', type:'card_nfc', card_uid:`UID-${ts()}`, enrolled_by: S.userId||'1', is_active:true }),
+    capture: r => { S.biometricId = r.data?.id; }},
+  { group:'Biometrics', name:'Get Biometric Enrollment', method:'GET', path: () => `/biometric-enrollments/${S.biometricId}`, auth:true, skip: () => !S.biometricId },
+  { group:'Biometrics', name:'Update Biometric Enrollment', method:'PATCH', path: () => `/biometric-enrollments/${S.biometricId}`, auth:true,
+    body: () => ({ is_active:false }), skip: () => !S.biometricId },
+
+  // ─── ATTENDANCE SESSIONS ─────────────────────────────────
+  { group:'Attendance', name:'List Attendance Sessions', method:'GET', path:'/attendance/sessions', auth:true },
+  { group:'Attendance', name:'Create Attendance Session', method:'POST', path:'/attendance/sessions', auth:true,
+    body: () => ({ section_id: S.sectionId||'1', subject_id: S.subjectId||'1', teacher_id: S.userId||'1', period_id: S.timetablePeriodId||'1', session_date:'2025-09-10', session_type:'class', started_at:'2025-09-10T08:00:00Z', notes:'Morning attendance' }),
+    capture: r => { S.attendanceSessionId = r.data?.id; }},
+  { group:'Attendance', name:'Get Attendance Session', method:'GET', path: () => `/attendance/sessions/${S.attendanceSessionId}`, auth:true, skip: () => !S.attendanceSessionId },
+  { group:'Attendance', name:'Create Attendance Record', method:'POST', path:'/attendance/records', auth:true,
+    body: () => ({ session_id: S.attendanceSessionId||'1', student_id: S.studentId||'1', status:'present', scan_method:'manual', notes:'On time' }),
+    capture: r => { S.attendanceRecordId = r.data?.id; }},
+  { group:'Attendance', name:'Bulk Attendance Records', method:'POST', path:'/attendance/records/bulk', auth:true,
+    body: () => ({ session_id: S.attendanceSessionId||'1', scan_method:'manual', records:[{ student_id: S.studentId||'1', status:'present' }] })},
+  { group:'Attendance', name:'Attendance Summary', method:'GET', path:'/attendance/records/summary?start_date=2025-09-01&end_date=2025-12-31', auth:true },
+  { group:'Attendance', name:'Close Attendance Session', method:'PATCH', path: () => `/attendance/sessions/${S.attendanceSessionId}/close`, auth:true, skip: () => !S.attendanceSessionId },
+
+  // ─── GATE LOGS ───────────────────────────────────────────
+  { group:'Gate Logs', name:'List Gate Logs', method:'GET', path:'/gate/logs', auth:true },
+  { group:'Gate Logs', name:'Active Students on Campus', method:'GET', path:'/gate/logs/active-on-campus', auth:true },
+  { group:'Gate Logs', name:'Create Gate Log', method:'POST', path:'/gate/logs', auth:true,
+    body: () => ({ student_id: S.studentId||'1', event_type:'entry', scan_method:'nfc', device_id:`dev-${ts()}`, is_flagged:false }),
+    capture: r => { S.gateLogId = r.data?.id; }},
+  { group:'Gate Logs', name:'Get Gate Log', method:'GET', path: () => `/gate/logs/${S.gateLogId}`, auth:true, skip: () => !S.gateLogId },
+  { group:'Gate Logs', name:'Update Gate Log', method:'PATCH', path: () => `/gate/logs/${S.gateLogId}`, auth:true,
+    body: () => ({ is_flagged:false }), skip: () => !S.gateLogId },
+
+  // ─── BOARDING: DORMITORIES ───────────────────────────────
+  { group:'Boarding', name:'List Dormitories', method:'GET', path:'/boarding/dormitories', auth:true },
+  { group:'Boarding', name:'Create Dormitory', method:'POST', path:'/boarding/dormitories', auth:true,
+    body: () => ({ name:`Dorm_${ts()}`, gender:'male', capacity:200, description:'Main dormitory' }),
+    capture: r => { S.dormitoryId = r.data?.id; }},
+  { group:'Boarding', name:'Get Dormitory', method:'GET', path: () => `/boarding/dormitories/${S.dormitoryId}`, auth:true, skip: () => !S.dormitoryId },
+  { group:'Boarding', name:'Create Room', method:'POST', path:'/boarding/rooms', auth:true,
+    body: () => ({ dormitory_id: S.dormitoryId||'1', room_number:`A-${ts()}`, capacity:8 }),
+    capture: r => { S.roomId = r.data?.id; }},
+  { group:'Boarding', name:'List Rooms', method:'GET', path:'/boarding/rooms', auth:true },
+  { group:'Boarding', name:'Create Boarding Assignment', method:'POST', path:'/boarding/assignments', auth:true,
+    body: () => ({ student_id: S.studentId||'1', dormitory_id: S.dormitoryId||'1', room_id: S.roomId||'1', bed_number:'B1', academic_year_id: S.academicYearId||'1', assigned_at:'2025-09-01' }),
+    capture: r => { S.boardingAssignmentId = r.data?.id; }},
+  { group:'Boarding', name:'List Boarding Assignments', method:'GET', path:'/boarding/assignments', auth:true },
+  { group:'Boarding', name:'Create Roll Call', method:'POST', path:'/boarding/roll-calls', auth:true,
+    body: () => ({ dormitory_id: S.dormitoryId||'1', roll_date:'2025-09-10', session_type:'morning', conducted_by: S.userId||'1', notes:'Daily roll call' }),
+    capture: r => { S.rollCallId = r.data?.id; }},
+  { group:'Boarding', name:'List Roll Calls', method:'GET', path:'/boarding/roll-calls', auth:true },
+  { group:'Boarding', name:'Roll Call Record', method:'POST', path: () => `/boarding/roll-calls/${S.rollCallId}/records`, auth:true,
+    body: () => ({ student_id: S.studentId||'1', status:'present', notes:'On time' }), skip: () => !S.rollCallId },
+  { group:'Boarding', name:'Roll Call Bulk Records', method:'POST', path: () => `/boarding/roll-calls/${S.rollCallId}/records/bulk`, auth:true,
+    body: () => ({ records:[{ student_id: S.studentId||'1', status:'present' }] }), skip: () => !S.rollCallId },
+  { group:'Boarding', name:'Roll Call Summary', method:'GET', path: () => `/boarding/roll-calls/${S.rollCallId}/summary`, auth:true, skip: () => !S.rollCallId },
+
+  // ─── BOARDING: STUDENT LEAVES ────────────────────────────
+  { group:'Student Leaves', name:'List Student Leaves', method:'GET', path:'/boarding/student-leaves', auth:true },
+  { group:'Student Leaves', name:'Create Student Leave', method:'POST', path:'/boarding/student-leaves', auth:true,
+    body: () => ({ student_id: S.studentId||'1', parent_id: S.parentId||'1', leave_type:'weekend', start_date:'2025-09-14', end_date:'2025-09-15', reason:'Family visit' }),
+    capture: r => { S.studentLeaveId = r.data?.id; }},
+  { group:'Student Leaves', name:'Get Student Leave', method:'GET', path: () => `/boarding/student-leaves/${S.studentLeaveId}`, auth:true, skip: () => !S.studentLeaveId },
+  { group:'Student Leaves', name:'Approve Leave', method:'PATCH', path: () => `/boarding/student-leaves/${S.studentLeaveId}/approve`, auth:true, skip: () => !S.studentLeaveId },
+  { group:'Student Leaves', name:'Reject Leave', method:'PATCH', path: () => `/boarding/student-leaves/${S.studentLeaveId}/reject`, auth:true,
+    body: () => ({ rejection_reason:'Not permitted at this time' }), skip: () => !S.studentLeaveId },
+
+  // ─── BOARDING: ABSENCE ALERTS ────────────────────────────
+  { group:'Absence Alerts', name:'List Absence Alerts', method:'GET', path:'/boarding/absence-alerts', auth:true },
+  { group:'Absence Alerts', name:'Create Absence Alert', method:'POST', path:'/boarding/absence-alerts', auth:true,
+    body: () => ({ student_id: S.studentId||'1', alert_type:'boarding_absent', severity:'high', description:'Absent from morning roll call' }),
+    capture: r => { S.absenceAlertId = r.data?.id; }},
+  { group:'Absence Alerts', name:'Get Absence Alert', method:'GET', path: () => `/boarding/absence-alerts/${S.absenceAlertId}`, auth:true, skip: () => !S.absenceAlertId },
+  { group:'Absence Alerts', name:'Resolve Absence Alert', method:'PATCH', path: () => `/boarding/absence-alerts/${S.absenceAlertId}/resolve`, auth:true,
+    body: () => ({ resolution_note:'Parent contacted and situation resolved' }), skip: () => !S.absenceAlertId },
+
+  // ─── OFFLINE SYNC ────────────────────────────────────────
+  { group:'Offline Sync', name:'Submit Offline Records', method:'POST', path:'/offline-sync', auth:true,
+    body: () => ({ device_id:`dev-${ts()}`, records:[{ local_id:`local-${ts()}`, record_type:'gate_log', payload:{ event_type:'entry', student_id: S.studentId||'1' } }] })},
+  { group:'Offline Sync', name:'Check Sync Status', method:'GET', path:'/offline-sync/status?device_id=dev-001', auth:true },
+
+  // ─── FEES ────────────────────────────────────────────────
+  { group:'Fees', name:'Fees Summary', method:'GET', path:'/fees/summary', auth:true },
+  { group:'Fees', name:'List Fee Structures', method:'GET', path:'/fees/structures', auth:true },
+  { group:'Fees', name:'Create Fee Structure', method:'POST', path:'/fees/structures', auth:true,
+    body: () => ({ academic_year_id: S.academicYearId||'1', term_id: S.termId||'1', class_id: S.classId||'1', name:'Tuition Fee', amount:250000, currency:'RWF', is_mandatory:true, due_date:'2025-10-01' }),
+    capture: r => { S.feeStructureId = r.data?.id; }},
+  { group:'Fees', name:'Get Fee Structure', method:'GET', path: () => `/fees/structures/${S.feeStructureId}`, auth:true, skip: () => !S.feeStructureId },
+  { group:'Fees', name:'Bulk Assign Fees', method:'POST', path:'/fees/assignments/bulk', auth:true,
+    body: () => ({ fee_structure_id: S.feeStructureId||'1', section_id: S.sectionId||'1', academic_year_id: S.academicYearId||'1', term_id: S.termId||'1', due_date:'2025-10-01' })},
+  { group:'Fees', name:'List Fee Assignments', method:'GET', path:'/fees/assignments', auth:true },
+  { group:'Fees', name:'Create Fee Assignment', method:'POST', path:'/fees/assignments', auth:true,
+    body: () => ({ student_id: S.studentId||'1', fee_structure_id: S.feeStructureId||'1', amount_due:250000, due_date:'2025-10-01' }),
+    capture: r => { S.feeAssignmentId = r.data?.id; }},
+  { group:'Fees', name:'Get Student Balance', method:'GET', path: () => `/fees/students/${S.studentId}/balance`, auth:true, skip: () => !S.studentId },
+  { group:'Fees', name:'List Fee Transactions', method:'GET', path:'/fees/transactions', auth:true },
+  { group:'Fees', name:'Create Fee Transaction', method:'POST', path:'/fees/transactions', auth:true,
+    body: () => ({ student_id: S.studentId||'1', fee_assignment_id: S.feeAssignmentId||'1', amount:100000, payment_method:'cash', payment_ref:`RCPT-${ts()}`, paid_at:'2025-09-15', notes:'Partial payment', currency:'RWF' }),
+    capture: r => { S.feeTransactionId = r.data?.id; }},
+  { group:'Fees', name:'Get Fee Transaction', method:'GET', path: () => `/fees/transactions/${S.feeTransactionId}`, auth:true, skip: () => !S.feeTransactionId },
+
+  // ─── EXAMS ───────────────────────────────────────────────
+  { group:'Exams', name:'List Exams', method:'GET', path:'/exams', auth:true },
+  { group:'Exams', name:'Create Exam', method:'POST', path:'/exams', auth:true,
+    body: () => ({ section_id: S.sectionId||'1', subject_id: S.subjectId||'1', teacher_id: S.userId||'1', term_id: S.termId||'1', name:'Math CAT 1', type:'cat', exam_date:'2025-10-10', start_time:'10:00', duration_min:60, max_marks:100, pass_mark:50, status:'scheduled' }),
+    capture: r => { S.examId = r.data?.id; }},
+  { group:'Exams', name:'Get Exam', method:'GET', path: () => `/exams/${S.examId}`, auth:true, skip: () => !S.examId },
+  { group:'Exams', name:'Update Exam', method:'PATCH', path: () => `/exams/${S.examId}`, auth:true,
+    body: () => ({ status:'ongoing' }), skip: () => !S.examId },
+  { group:'Exams', name:'Bulk Submit Exam Results', method:'POST', path:'/exam-results/bulk', auth:true,
+    body: () => ({ exam_id: S.examId||'1', results:[{ student_id: S.studentId||'1', score:80, grade:'A' }] })},
+  { group:'Exams', name:'List Exam Results', method:'GET', path:'/exam-results', auth:true },
+  { group:'Exams', name:'Create Exam Result', method:'POST', path:'/exam-results', auth:true,
+    body: () => ({ exam_id: S.examId||'1', student_id: S.studentId||'1', score:75, grade:'B', remarks:'Good effort', is_absent:false }),
+    capture: r => { S.examResultId = r.data?.id; }},
+  { group:'Exams', name:'Exam Results Summary', method:'GET', path: () => `/exam-results/summary/${S.examId}`, auth:true, skip: () => !S.examId },
+  { group:'Exams', name:'Results by Student', method:'GET', path: () => `/exam-results/by-student/${S.studentId}`, auth:true, skip: () => !S.studentId },
+
+  // ─── VISITORS ────────────────────────────────────────────
+  { group:'Visitors', name:'List Visitors', method:'GET', path:'/visitors', auth:true },
+  { group:'Visitors', name:'Create Visitor', method:'POST', path:'/visitors', auth:true,
+    body: () => ({ full_name:'John Visitor', phone:`+25070000${ts().slice(-4)}`, email:`visitor_${ts()}@test.com`, organization:'ACME Corp', visitor_type:'organization' }),
+    capture: r => { S.visitorId = r.data?.id; }},
+  { group:'Visitors', name:'Get Visitor', method:'GET', path: () => `/visitors/${S.visitorId}`, auth:true, skip: () => !S.visitorId },
+  { group:'Visitors', name:'Create Visitor Appointment', method:'POST', path:'/visitor-appointments', auth:true,
+    body: () => ({ visitor_id: S.visitorId||'1', student_id: S.studentId||'1', host_id: S.userId||'1', purpose:'parent_visit', appointment_at:'2025-09-18T09:00:00Z', expected_duration_min:30, notes:'Discuss academic progress' }),
+    capture: r => { S.visitorAppointmentId = r.data?.id; }},
+  { group:'Visitors', name:'List Visitor Appointments', method:'GET', path:'/visitor-appointments', auth:true },
+  { group:'Visitors', name:'Confirm Appointment', method:'PATCH', path: () => `/visitor-appointments/${S.visitorAppointmentId}/confirm`, auth:true, skip: () => !S.visitorAppointmentId },
+  { group:'Visitors', name:'Create Visitor Visit', method:'POST', path:'/visitor-visits', auth:true,
+    body: () => ({ visitor_id: S.visitorId||'1', appointment_id: S.visitorAppointmentId||'1', student_id: S.studentId||'1', host_id: S.userId||'1', purpose:'parent_visit', checked_in_at:'2025-09-18T09:05:00Z', expected_out_at:'2025-09-18T09:35:00Z', badge_printed:true, sms_sent_host:true }),
+    capture: r => { S.visitorVisitId = r.data?.id; }},
+  { group:'Visitors', name:'Check Out Visit', method:'PATCH', path: () => `/visitor-visits/${S.visitorVisitId}/check-out`, auth:true, skip: () => !S.visitorVisitId },
+
+  // ─── DEVICES ─────────────────────────────────────────────
+  { group:'Devices', name:'List Devices', method:'GET', path:'/devices', auth:true },
+  { group:'Devices', name:'Create Device', method:'POST', path:'/devices', auth:true,
+    body: () => ({ device_uid:`DEV-${ts()}`, name:'Gate Tablet', type:'tablet', location:'Main Gate', mode:'gate', pin:'1234', firmware_version:'1.0.0' }),
+    capture: r => { S.deviceId = r.data?.id; }},
+  { group:'Devices', name:'Get Device', method:'GET', path: () => `/devices/${S.deviceId}`, auth:true, skip: () => !S.deviceId },
+  { group:'Devices', name:'Update Device', method:'PATCH', path: () => `/devices/${S.deviceId}`, auth:true,
+    body: () => ({ location:'Secondary Gate' }), skip: () => !S.deviceId },
+  { group:'Devices', name:'Deactivate Device', method:'PATCH', path: () => `/devices/${S.deviceId}/deactivate`, auth:true, skip: () => !S.deviceId },
+
+  // ─── STAFF PROFILES ──────────────────────────────────────
+  { group:'Staff', name:'List Staff Profiles', method:'GET', path:'/staff/profiles', auth:true },
+  { group:'Staff', name:'Create Staff Profile', method:'POST', path:'/staff/profiles', auth:true,
+    body: () => ({ user_id: S.userId||'1', staff_id_number:`STF-${ts()}`, gender:'male', department:'Science', contract_type:'permanent', join_date:'2020-01-01', employment_status:'active', subjects:['Math','Physics'] }),
+    capture: r => { S.staffProfileId = r.data?.id; }},
+  { group:'Staff', name:'Get Staff Profile', method:'GET', path: () => `/staff/profiles/${S.staffProfileId}`, auth:true, skip: () => !S.staffProfileId },
+  { group:'Staff', name:'Update Staff Profile', method:'PATCH', path: () => `/staff/profiles/${S.staffProfileId}`, auth:true,
+    body: () => ({ department:'Mathematics' }), skip: () => !S.staffProfileId },
+  { group:'Staff', name:'List Leave Balances', method:'GET', path:'/staff/leave-balances', auth:true },
+  { group:'Staff', name:'Create Leave Balance', method:'POST', path:'/staff/leave-balances', auth:true,
+    body: () => ({ staff_id: S.staffProfileId||'1', academic_year_id: S.academicYearId||'1', annual_days:30, sick_days:10, emergency_days:5 }),
+    capture: r => { S.leaveBalanceId = r.data?.id; }},
+  { group:'Staff', name:'Get Leave Balance', method:'GET', path: () => `/staff/leave-balances/${S.leaveBalanceId}`, auth:true, skip: () => !S.leaveBalanceId },
+  { group:'Staff', name:'Deduct Leave Balance', method:'PATCH', path: () => `/staff/leave-balances/${S.leaveBalanceId}/deduct`, auth:true,
+    body: () => ({ leave_type:'annual', days:2 }), skip: () => !S.leaveBalanceId },
+
+  // ─── SALARY RECORDS ──────────────────────────────────────
+  { group:'Salary', name:'List Salary Records', method:'GET', path:'/salary-records', auth:true },
+  { group:'Salary', name:'Create Salary Record', method:'POST', path:'/salary-records', auth:true,
+    body: () => ({ staff_id: S.staffProfileId||'1', month:9, year:2025, basic_salary:500000, allowances:50000, deductions:10000, net_salary:540000, notes:'September salary' }),
+    capture: r => { S.salaryRecordId = r.data?.id; }},
+  { group:'Salary', name:'Get Salary Record', method:'GET', path: () => `/salary-records/${S.salaryRecordId}`, auth:true, skip: () => !S.salaryRecordId },
+  { group:'Salary', name:'Mark Salary Paid', method:'PATCH', path: () => `/salary-records/${S.salaryRecordId}/mark-paid`, auth:true,
+    body: () => ({ payment_method:'bank_transfer', paid_at:'2025-09-30' }), skip: () => !S.salaryRecordId },
+
+  // ─── NOTIFICATIONS ───────────────────────────────────────
+  { group:'Notifications', name:'List Notification Logs', method:'GET', path:'/notifications/logs', auth:true },
+  { group:'Notifications', name:'Send Notification', method:'POST', path:'/notifications/send', auth:true,
+    body: () => ({ channel:'sms', recipient_phone:'+250700000099', message:'Hello from Education Care Africa!', type:'general' })},
+  { group:'Notifications', name:'Send Bulk Notification', method:'POST', path:'/notifications/send-bulk', auth:true,
+    body: () => ({ template_id: S.notificationTemplateId||null, variables:{ term:'Term 1' }, recipients:[{ recipient_type:'parent', recipient_id: S.parentId||'1' }] })},
+  { group:'Notifications', name:'List Notification Templates', method:'GET', path:'/notifications/templates', auth:true },
+  { group:'Notifications', name:'Create Notification Template', method:'POST', path:'/notifications/templates', auth:true,
+    body: () => ({ name:'Fee Reminder', slug:`fee_reminder_${ts()}`, trigger_type:'fees', body_en:'Dear {{name}}, your fees are due.', variables:{ name:'string' }, is_active:true }),
+    capture: r => { S.notificationTemplateId = r.data?.id; }},
+  { group:'Notifications', name:'Get Notification Template', method:'GET', path: () => `/notifications/templates/${S.notificationTemplateId}`, auth:true, skip: () => !S.notificationTemplateId },
+  { group:'Notifications', name:'Render Notification Template', method:'POST', path: () => `/notifications/templates/${S.notificationTemplateId}/render`, auth:true,
+    body: () => ({ variables:{ name:'Alice Uwimana' }, language:'en' }), skip: () => !S.notificationTemplateId },
+
+  // ─── AUDIT LOGS ──────────────────────────────────────────
+  { group:'Audit Logs', name:'List Audit Logs', method:'GET', path:'/audit-logs?page=1&limit=20', auth:true },
+
+  // ─── SYSTEM SETTINGS ─────────────────────────────────────
+  { group:'Settings', name:'List System Settings', method:'GET', path:'/system-settings', auth:true },
+  { group:'Settings', name:'Create System Setting', method:'POST', path:'/system-settings', auth:true,
+    body: () => ({ key_name:`late_threshold_${ts()}`, value:10, type:'integer' }),
+    capture: r => { S.systemSettingId = r.data?.id; }},
+  { group:'Settings', name:'Get System Setting', method:'GET', path: () => `/system-settings/${S.systemSettingId}`, auth:true, skip: () => !S.systemSettingId },
+  { group:'Settings', name:'Update System Setting', method:'PATCH', path: () => `/system-settings/${S.systemSettingId}`, auth:true,
+    body: () => ({ value:15 }), skip: () => !S.systemSettingId },
+
+  // ─── PLATFORM: FEATURE FLAGS ─────────────────────────────
+  { group:'Platform Feature Flags', name:'List Feature Flags', method:'GET', path:'/feature-flags', auth:'platform' },
+  { group:'Platform Feature Flags', name:'Create Feature Flag', method:'POST', path:'/feature-flags', auth:'platform',
+    body: () => ({ key_name:`feature_${ts()}`, label:'New Feature', description:'Test feature', is_enabled:true, is_beta:false }),
+    capture: r => { S.featureFlagId = r.data?.id; }},
+  { group:'Platform Feature Flags', name:'Get Feature Flag', method:'GET', path: () => `/feature-flags/${S.featureFlagId}`, auth:'platform', skip: () => !S.featureFlagId },
+  { group:'Platform Feature Flags', name:'Update Feature Flag', method:'PATCH', path: () => `/feature-flags/${S.featureFlagId}`, auth:'platform',
+    body: () => ({ is_enabled:false }), skip: () => !S.featureFlagId },
+
+  // ─── PLATFORM: PLANS ─────────────────────────────────────
+  { group:'Platform Plans', name:'List Platform Plans', method:'GET', path:'/platform/plans', auth:'platform' },
+  { group:'Platform Plans', name:'Create Platform Plan', method:'POST', path:'/platform/plans', auth:'platform',
+    body: () => ({ name:`Plan_${ts()}`, price_monthly:10000, price_annual:100000, student_limit:500, staff_limit:50, sms_bundle:1000, features:['fees','attendance'], is_active:true, sort_order:1 }),
+    capture: r => { S.platformPlanId = r.data?.id; }},
+  { group:'Platform Plans', name:'Get Platform Plan', method:'GET', path: () => `/platform/plans/${S.platformPlanId}`, auth:'platform', skip: () => !S.platformPlanId },
+  { group:'Platform Plans', name:'Update Platform Plan', method:'PATCH', path: () => `/platform/plans/${S.platformPlanId}`, auth:'platform',
+    body: () => ({ sms_bundle:2000 }), skip: () => !S.platformPlanId },
+
+  // ─── PLATFORM: SCHOOLS ───────────────────────────────────
+  { group:'Platform Schools', name:'List Platform Schools', method:'GET', path:'/platform/schools', auth:'platform' },
+  { group:'Platform Schools', name:'Create Platform School', method:'POST', path:'/platform/schools', auth:'platform',
+    body: () => ({ name:`TestSchool_${ts()}`, school_type:'private', province:'Kigali', district:'Gasabo', sector:'Kacyiru', principal_name:'Head Teacher', principal_phone:'+250700000011', principal_email:`head_${ts()}@school.test`, school_phone:'+250700000012', school_email:`info_${ts()}@school.test`, subscription_plan_id: S.platformPlanId||'1', status:'trial', timezone:'Africa/Kigali', currency:'RWF', has_boarding:true, has_biometrics:true, has_gate:true, has_visitor_mgmt:true, has_exam_system:true, has_salary_mgmt:true, has_parent_app:true, has_bulk_sms:true }),
+    capture: r => { S.platformSchoolId = r.data?.id; }},
+  { group:'Platform Schools', name:'Get Platform School', method:'GET', path: () => `/platform/schools/${S.platformSchoolId}`, auth:'platform', skip: () => !S.platformSchoolId },
+  { group:'Platform Schools', name:'Update Platform School', method:'PATCH', path: () => `/platform/schools/${S.platformSchoolId}`, auth:'platform',
+    body: () => ({ status:'active' }), skip: () => !S.platformSchoolId },
+
+  // ─── PLATFORM: USERS ─────────────────────────────────────
+  { group:'Platform Users', name:'List Platform Users', method:'GET', path:'/platform/users', auth:'platform' },
+  { group:'Platform Users', name:'Create Platform User', method:'POST', path:'/platform/users', auth:'platform',
+    body: () => ({ name:`Support_${ts()}`, email:`support_${ts()}@platform.test`, password:'StrongPass123', role:'support', access_scope:'all', permissions:[], status:'active' }),
+    capture: r => { S.platformUserId = r.data?.id; }},
+  { group:'Platform Users', name:'Get Platform User', method:'GET', path: () => `/platform/users/${S.platformUserId}`, auth:'platform', skip: () => !S.platformUserId },
+  { group:'Platform Users', name:'Update Platform User', method:'PATCH', path: () => `/platform/users/${S.platformUserId}`, auth:'platform',
+    body: () => ({ status:'inactive' }), skip: () => !S.platformUserId },
+
+  // ─── PLATFORM: SUBSCRIPTIONS ─────────────────────────────
+  { group:'Platform Subscriptions', name:'List Subscriptions', method:'GET', path:'/platform/subscriptions', auth:'platform' },
+  { group:'Platform Subscriptions', name:'Create Subscription', method:'POST', path:'/platform/subscriptions', auth:'platform',
+    body: () => ({ school_id: S.platformSchoolId||'1', plan_id: S.platformPlanId||'1', billing_cycle:'monthly', amount:10000, currency:'RWF', status:'active', starts_at:'2025-09-01', ends_at:'2025-10-01', auto_renew:true }),
+    capture: r => { S.platformSubscriptionId = r.data?.id; }},
+  { group:'Platform Subscriptions', name:'Get Subscription', method:'GET', path: () => `/platform/subscriptions/${S.platformSubscriptionId}`, auth:'platform', skip: () => !S.platformSubscriptionId },
+
+  // ─── PLATFORM: INVOICES ──────────────────────────────────
+  { group:'Platform Invoices', name:'List Platform Invoices', method:'GET', path:'/platform/invoices', auth:'platform' },
+  { group:'Platform Invoices', name:'Create Platform Invoice', method:'POST', path:'/platform/invoices', auth:'platform',
+    body: () => ({ invoice_number:`INV-${ts()}`, school_id: S.platformSchoolId||'1', subscription_id: S.platformSubscriptionId||'1', period_start:'2025-09-01', period_end:'2025-09-30', issue_date:'2025-09-01', due_date:'2025-09-15', subtotal:10000, tax_rate:0, tax_amount:0, discount_amount:0, total:10000, currency:'RWF', status:'issued', created_by: S.platformUserId || S.platformAdminId || '1', line_items:[{ description:'Monthly Subscription', quantity:1, unit_price:10000, total:10000 }] }),
+    capture: r => { S.platformInvoiceId = r.data?.id; }},
+  { group:'Platform Invoices', name:'Get Platform Invoice', method:'GET', path: () => `/platform/invoices/${S.platformInvoiceId}`, auth:'platform', skip: () => !S.platformInvoiceId },
+
+  // ─── PLATFORM: REVENUE ───────────────────────────────────
+  { group:'Platform Revenue', name:'Platform Revenue Summary', method:'GET', path:'/platform/revenue?from=2025-01-01&to=2025-12-31', auth:'platform' },
+
+  // ─── PLATFORM: ANNOUNCEMENTS ─────────────────────────────
+  { group:'Platform Announcements', name:'List Announcements', method:'GET', path:'/platform/announcements', auth:'platform' },
+  { group:'Platform Announcements', name:'Create Announcement', method:'POST', path:'/platform/announcements', auth:'platform',
+    body: () => ({ title:'Scheduled Maintenance', body:'System will undergo scheduled maintenance.', type:'maintenance', target_scope:'all', status:'scheduled', scheduled_at:'2025-09-20T20:00:00Z', send_inapp:true, send_email:true }),
+    capture: r => { S.announcementId = r.data?.id; }},
+  { group:'Platform Announcements', name:'Get Announcement', method:'GET', path: () => `/platform/announcements/${S.announcementId}`, auth:'platform', skip: () => !S.announcementId },
+  { group:'Platform Announcements', name:'Mark Announcement Read', method:'POST', path: () => `/platform/announcements/${S.announcementId}/read`, auth:'platform',
+    body: () => ({ school_id: S.platformSchoolId||'1', user_id: S.platformUserId || S.platformAdminId || '1' }), skip: () => !S.announcementId },
+
+  // ─── PLATFORM: SUPPORT TICKETS ───────────────────────────
+  { group:'Support Tickets', name:'List Support Tickets', method:'GET', path:'/platform/support-tickets', auth:'platform' },
+  { group:'Support Tickets', name:'Create Support Ticket', method:'POST', path:'/platform/support-tickets', auth:'platform',
+    body: () => ({ school_id: S.platformSchoolId||'1', opened_by: S.platformUserId || S.platformAdminId || '1', subject:'Login issue', category:'technical', priority:'high', status:'open' }),
+    capture: r => { S.supportTicketId = r.data?.id; }},
+  { group:'Support Tickets', name:'Get Support Ticket', method:'GET', path: () => `/platform/support-tickets/${S.supportTicketId}`, auth:'platform', skip: () => !S.supportTicketId },
+  { group:'Support Tickets', name:'Update Support Ticket', method:'PATCH', path: () => `/platform/support-tickets/${S.supportTicketId}`, auth:'platform',
+    body: () => ({ status:'in_progress' }), skip: () => !S.supportTicketId },
+  { group:'Support Tickets', name:'Get Ticket Messages', method:'GET', path: () => `/platform/support-tickets/${S.supportTicketId}/messages`, auth:'platform', skip: () => !S.supportTicketId },
+  { group:'Support Tickets', name:'Create Ticket Message', method:'POST', path: () => `/platform/support-tickets/${S.supportTicketId}/messages`, auth:'platform',
+    body: () => ({ sender_type:'platform_user', sender_id: S.platformUserId || S.platformAdminId || '1', body:'We are investigating this issue. Please hold on.', is_internal:false }),
+    capture: r => { S.ticketMessageId = r.data?.id; }, skip: () => !S.supportTicketId },
+  
+  // ─── PLATFORM: SMS PROVIDERS ─────────────────────────────
+  { group:'SMS Providers', name:'List SMS Providers', method:'GET', path:'/platform/sms-providers', auth:'platform' },
+  { group:'SMS Providers', name:'Create SMS Provider', method:'POST', path:'/platform/sms-providers', auth:'platform',
+    body: () => ({ name:`Provider_${ts()}`, slug:`provider_${ts()}`, sender_id:'ECARE', is_default:false, is_active:true, priority:2, config:{} }),
+    capture: r => { S.smsProviderId = r.data?.id; }},
+  { group:'SMS Providers', name:'Get SMS Provider', method:'GET', path: () => `/platform/sms-providers/${S.smsProviderId}`, auth:'platform', skip: () => !S.smsProviderId },
+  { group:'SMS Providers', name:'Update SMS Provider', method:'PATCH', path: () => `/platform/sms-providers/${S.smsProviderId}`, auth:'platform',
+    body: () => ({ is_active:false }), skip: () => !S.smsProviderId },
+];
+
+// ============================================================
+// BUILD SIDEBAR NAV
+// ============================================================
+function buildNav() {
+  const nav = document.getElementById('nav');
+  const groups = {};
+  TESTS.forEach((t, i) => {
+    if (!groups[t.group]) groups[t.group] = [];
+    groups[t.group].push({ ...t, idx: i });
+  });
+
+  // Separate school vs platform groups
+  const platformGroups = new Set(['Platform Feature Flags','Platform Schools','Platform Plans','Platform Subscriptions','Platform Invoices','Platform Revenue','Platform Users','Platform Announcements','Support Tickets','SMS Providers']);
+
+  const schoolEntries = Object.entries(groups).filter(([g]) => !platformGroups.has(g));
+  const platformEntries = Object.entries(groups).filter(([g]) => platformGroups.has(g));
+
+  nav.innerHTML = '';
+
+  const addSection = (label, entries) => {
+    const sec = document.createElement('div');
+    sec.className = 'nav-section';
+    sec.textContent = label;
+    nav.appendChild(sec);
+    for (const [grp, items] of entries) {
+      const div = document.createElement('div');
+      div.className = 'nav-group';
+      div.innerHTML = `<div class="nav-group-title" onclick="this.parentElement.classList.toggle('collapsed')">${grp} <span class="arrow">▾</span></div>`;
+      const itemsDiv = document.createElement('div');
+      itemsDiv.className = 'nav-items';
+      items.forEach(t => {
+        const it = document.createElement('div');
+        it.className = `nav-item method-${t.method}`;
+        it.dataset.idx = t.idx;
+        it.innerHTML = `<span class="method-tag">${t.method}</span><span>${t.name}</span>`;
+        it.onclick = () => scrollToTest(t.idx);
+        itemsDiv.appendChild(it);
+      });
+      div.appendChild(itemsDiv);
+      nav.appendChild(div);
+    }
+  };
+
+  addSection('School Endpoints', schoolEntries);
+  addSection('Platform Endpoints', platformEntries);
+}
+
+// ============================================================
+// BUILD TEST CARDS
+// ============================================================
+function buildCards() {
+  const container = document.getElementById('results');
+  container.innerHTML = '';
+  let lastGroup = '';
+  TESTS.forEach((t, i) => {
+    if (t.group !== lastGroup) {
+      const hdr = document.createElement('div');
+      hdr.className = 'group-header';
+      const count = TESTS.filter(x => x.group === t.group).length;
+      hdr.innerHTML = `${t.group} <span class="group-count">${count} test${count>1?'s':''}</span>`;
+      container.appendChild(hdr);
+      lastGroup = t.group;
+    }
+    const card = document.createElement('div');
+    card.className = 'test-card';
+    card.id = `test-${i}`;
+    card.innerHTML = `
+      <div class="test-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="method-tag" style="font-size:10px">${t.method}</span>
+        <span class="test-title">${t.name}</span>
+        <span class="time" id="time-${i}"></span>
+        <span class="test-status status-pending" id="status-${i}">PENDING</span>
+      </div>
+      <div class="test-body">
+        <div class="test-section">
+          <div class="test-section-label">Request</div>
+          <pre class="json" id="req-${i}">—</pre>
+        </div>
+        <div class="test-section">
+          <div class="test-section-label">Response</div>
+          <pre class="json" id="res-${i}">—</pre>
+        </div>
+      </div>`;
+    container.appendChild(card);
+  });
+}
+
+// ============================================================
+// RUN A SINGLE TEST
+// ============================================================
+async function runTest(i) {
+  const t = TESTS[i];
+  const statusEl = document.getElementById(`status-${i}`);
+  const reqEl    = document.getElementById(`req-${i}`);
+  const resEl    = document.getElementById(`res-${i}`);
+  const timeEl   = document.getElementById(`time-${i}`);
+  const card     = document.getElementById(`test-${i}`);
+
+  if (t.skip && t.skip()) {
+    statusEl.textContent = 'SKIP';
+    statusEl.className = 'test-status status-skip';
+    resEl.textContent = 'Skipped — prerequisite ID not available';
+    return 'skip';
+  }
+
+  statusEl.textContent = 'RUNNING';
+  statusEl.className = 'test-status status-running';
+
+  const url = BASE() + (typeof t.path === 'function' ? t.path() : t.path);
+  const headers = { 'Content-Type': 'application/json' };
+  const authToken = getAuthToken(t.auth);
+  if (t.auth && authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+  const bodyData = t.body ? t.body() : undefined;
+  const opts = { method: t.method, headers };
+  if (bodyData && !['GET','HEAD'].includes(t.method)) opts.body = JSON.stringify(bodyData);
+
+  reqEl.textContent = `${t.method} ${url}` + (opts.body ? '\n\n' + JSON.stringify(bodyData, null, 2) : '');
+
+  const start = performance.now();
+  try {
+    const resp = await fetch(url, opts);
+    const ms = Math.round(performance.now() - start);
+    timeEl.textContent = `${ms}ms`;
+
+    let data;
+    const ct = resp.headers.get('content-type') || '';
+    data = ct.includes('json') ? await resp.json() : await resp.text();
+
+    resEl.textContent = `HTTP ${resp.status}\n\n` + (typeof data === 'string' ? data : JSON.stringify(data, null, 2));
+
+    const ok = resp.status >= 200 && resp.status < 400;
+    if (ok) {
+      statusEl.textContent = '✓ PASS';
+      statusEl.className = 'test-status status-pass';
+      if (t.capture && typeof data === 'object') t.capture(data);
+      updateTokenDisplay();
+      return 'pass';
+    } else {
+      statusEl.textContent = `✗ ${resp.status}`;
+      statusEl.className = 'test-status status-fail';
+      card.classList.add('open');
+      return 'fail';
+    }
+  } catch (e) {
+    const ms = Math.round(performance.now() - start);
+    timeEl.textContent = `${ms}ms`;
+    resEl.textContent = `Network error: ${e.message}\n\nMake sure your backend is running at:\n${BASE()}`;
+    statusEl.textContent = 'ERR';
+    statusEl.className = 'test-status status-fail';
+    card.classList.add('open');
+    return 'fail';
+  }
+}
+
+// ============================================================
+// RUN ALL / RUN GROUP
+// ============================================================
+let running = false;
+async function runAll() {
+  if (running) return;
+  running = true;
+  resetAll({ keepTokens: false });
+  const total = TESTS.length;
+  let pass=0, fail=0, skip=0;
+  const deferred = [];
+  const runAndTrack = async (i) => {
+    const result = await runTest(i);
+    if (result==='pass') pass++;
+    else if (result==='fail') fail++;
+    else skip++;
+    updateStats(pass, fail, skip, total);
+    document.getElementById('progressFill').style.width = `${((pass+fail+skip)/total)*100}%`;
+  };
+
+  for (let i=0; i<total; i++) {
+    if (TESTS[i].defer) { deferred.push(i); continue; }
+    await runAndTrack(i);
+  }
+  for (const i of deferred) await runAndTrack(i);
+  running = false;
+}
+
+async function promptRunGroup() {
+  const groups = [...new Set(TESTS.map(t => t.group))];
+  const groupName = prompt(`Enter group name to run:\n\n${groups.join('\n')}`);
+  if (!groupName) return;
+  const indices = TESTS.map((t,i) => t.group === groupName ? i : -1).filter(i => i>=0);
+  if (!indices.length) { alert('No tests found for: ' + groupName); return; }
+  const normal = indices.filter(i => !TESTS[i].defer);
+  const deferred = indices.filter(i => TESTS[i].defer);
+  for (const i of normal) await runTest(i);
+  for (const i of deferred) await runTest(i);
+}
+
+function resetAll(options = {}) {
+  resetState(options);
+  TESTS.forEach((_, i) => {
+    document.getElementById(`status-${i}`).textContent = 'PENDING';
+    document.getElementById(`status-${i}`).className = 'test-status status-pending';
+    document.getElementById(`req-${i}`).textContent = '—';
+    document.getElementById(`res-${i}`).textContent = '—';
+    document.getElementById(`time-${i}`).textContent = '';
+    document.getElementById(`test-${i}`).classList.remove('open');
+  });
+  document.getElementById('progressFill').style.width = '0%';
+  updateStats(0,0,0,TESTS.length);
+}
+
+function updateStats(p,f,s,total) {
+  document.getElementById('stats').innerHTML =
+    `<span><span class="dot dot-pass"></span>${p}</span>` +
+    `<span><span class="dot dot-fail"></span>${f}</span>` +
+    `<span><span class="dot dot-skip"></span>${s} skip</span>` +
+    `<span style="color:var(--muted)">${p+f+s}/${total}</span>`;
+}
+
+function updateTokenDisplay() {
+  const el = document.getElementById('tokenDisplay');
+  const info = document.getElementById('tokenInfo');
+  const hasSchool = Boolean(S.token);
+  const hasPlatform = Boolean(S.platformToken);
+  if (hasSchool || hasPlatform) {
+    const schoolLabel = hasSchool ? `School ${S.token.slice(0,8)}...` : 'School none';
+    const platformLabel = hasPlatform ? `Platform ${S.platformToken.slice(0,8)}...` : 'Platform none';
+    el.textContent = `${schoolLabel} | ${platformLabel}`;
+    el.className = 'token-display';
+    if (info) {
+      const parts = [];
+      if (hasSchool) parts.push(`School token (${S.token.length} chars)`);
+      if (hasPlatform) parts.push(`Platform token (${S.platformToken.length} chars)`);
+      info.textContent = parts.length ? parts.join(' | ') : 'No token set';
+      info.style.color = parts.length ? 'var(--green)' : 'var(--muted)';
+    }
+  } else {
+    el.textContent = 'No token';
+    el.className = 'token-display none';
+    if (info) { info.textContent = 'No token set'; info.style.color='var(--muted)'; }
+  }
+}
+
+function scrollToTest(i) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.nav-item[data-idx="${i}"]`)?.classList.add('active');
+  document.getElementById(`test-${i}`)?.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+// ============================================================
+// AUTH PANEL
+// ============================================================
+function switchTab(evt, name) {
+  document.querySelectorAll('.auth-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.auth-section').forEach(s => s.classList.remove('active'));
+  if (evt && evt.target) evt.target.classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+function showLoginStatus(msg, ok) {
+  const el = document.getElementById('loginStatus');
+  el.textContent = msg;
+  el.className = 'login-status ' + (ok ? 'ok' : 'err');
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+
+async function quickLogin(type) {
+  const email    = type === 'platform'
+    ? (document.getElementById('platformEmail').value || 'admin@platform.test')
+    : (document.getElementById('schoolEmail').value || 'admin@school.test');
+  const password = type === 'platform'
+    ? (document.getElementById('platformPassword').value || 'password123')
+    : (document.getElementById('schoolPassword').value || 'password123');
+  const endpoint = type === 'platform' ? '/auth/platform/login' : '/auth/login';
+
+  try {
+    const resp = await fetch(BASE() + endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const json = await resp.json();
+    if (resp.ok && json.data?.accessToken) {
+      if (type === 'platform') {
+        S.platformToken = json.data.accessToken;
+        S.platformRefreshToken = json.data.refreshToken || '';
+        S.platformAdminId = json.data.user?.id || S.platformAdminId;
+      } else {
+        S.token = json.data.accessToken;
+        S.refreshToken = json.data.refreshToken || '';
+        S.userId = json.data.user?.id || '';
+      }
+      saveTokenToStorage();
+      updateTokenDisplay();
+      showLoginStatus(`✓ Logged in as ${email} (${type})`, true);
+    } else {
+      showLoginStatus(`✗ Login failed: ${json.error?.message || json.message || resp.statusText}`, false);
+    }
+  } catch (e) {
+    showLoginStatus(`✗ Network error: ${e.message}`, false);
+  }
+}
+
+function applyManualToken() {
+  const token = document.getElementById('manualToken').value.trim();
+  if (!token) { showLoginStatus('Paste a token first', false); return; }
+  const type = document.getElementById('manualTokenType')?.value || 'school';
+  if (type === 'platform') S.platformToken = token;
+  else S.token = token;
+  saveTokenToStorage();
+  updateTokenDisplay();
+  showLoginStatus(`Token applied (${type})`, true);
+}
+
+function clearToken(type = 'all') {
+  const clearSchool = type === 'school' || type === 'all';
+  const clearPlatform = type === 'platform' || type === 'all';
+  if (clearSchool) { S.token = ''; S.refreshToken = ''; S.userId = ''; }
+  if (clearPlatform) { S.platformToken = ''; S.platformRefreshToken = ''; S.platformAdminId = ''; }
+  saveTokenToStorage();
+  updateTokenDisplay();
+  const msg = type === 'all' ? 'Tokens cleared' : `${type} token cleared`;
+  showLoginStatus(msg, false);
+}
+
+function saveTokenToStorage() {
+  try {
+    if (S.token) localStorage.setItem('eca_api_token', S.token);
+    else localStorage.removeItem('eca_api_token');
+    if (S.refreshToken) localStorage.setItem('eca_api_refresh', S.refreshToken);
+    else localStorage.removeItem('eca_api_refresh');
+    if (S.platformToken) localStorage.setItem('eca_api_platform_token', S.platformToken);
+    else localStorage.removeItem('eca_api_platform_token');
+    if (S.platformRefreshToken) localStorage.setItem('eca_api_platform_refresh', S.platformRefreshToken);
+    else localStorage.removeItem('eca_api_platform_refresh');
+  } catch(e){}
+}
+
+function loadTokenFromStorage() {
+  try {
+    const t = localStorage.getItem('eca_api_token');
+    const r = localStorage.getItem('eca_api_refresh');
+    const pt = localStorage.getItem('eca_api_platform_token');
+    const pr = localStorage.getItem('eca_api_platform_refresh');
+    if (t) { S.token = t; S.refreshToken = r || ''; }
+    if (pt) { S.platformToken = pt; S.platformRefreshToken = pr || ''; }
+  } catch(e){}
+  updateTokenDisplay();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+buildNav();
+buildCards();
+updateStats(0,0,0,TESTS.length);
+loadTokenFromStorage();
+</script>
+</body>
+</html>
