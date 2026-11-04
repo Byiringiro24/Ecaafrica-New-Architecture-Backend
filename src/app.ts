@@ -259,7 +259,7 @@ app.get("/api/v1/tablet-bridge/dev-password/:uuid", async (req: import("express"
     return res.json({ hasPassword: false });
   }
 });
-app.get("/api/v1/tablet-bridge/device-assignments/:uuid", async (req: import("express").Request, res: import("express").Response") => {
+app.get("/api/v1/tablet-bridge/device-assignments/:uuid", async (req: import("express").Request, res: import("express").Response) => {
   try {
     const { prisma: db } = await import("./database/prisma");
     const tablet = await (db as any).tablets.findFirst({
@@ -308,7 +308,9 @@ app.get("/api/v1/tablet-bridge/device-assignments/:uuid", async (req: import("ex
   } catch {
     return res.status(500).json({ success: false, error: "Server error" });
   }
-});app.use("/api/v1/users", userRoutes);
+});
+
+app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/roles", roleRoutes);
 app.use("/api/v1/academic-years", academicYearRoutes);
 app.use("/api/v1/terms", termRoutes);
