@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "node api.js && nodemon --watch src --ext ts --exec \"node --max-old-space-size=2048 -r ts-node/register/transpile-only src/server.ts\"",
-    "build": "node api.js && tsc -p tsconfig.json",
-    "start": "node api.js && node dist/server.js",
+    "dev": "node init && nodemon --watch src --ext ts --exec \"node --max-old-space-size=2048 -r ts-node/register/transpile-only src/server.ts\"",
+    "build": "node init && tsc -p tsconfig.json",
+    "start": "node init && node dist/server.js",
     "prisma:generate": "prisma generate --schema src/models/schema.prisma",
     "prisma:format": "prisma format --schema src/models/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema src/models/schema.prisma",
