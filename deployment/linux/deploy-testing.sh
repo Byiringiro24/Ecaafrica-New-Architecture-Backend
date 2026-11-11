@@ -149,8 +149,14 @@ echo "  Active DATABASE_URL: $(grep '^DATABASE_URL=' "$ENV_FILE" | head -1)"
 # ── 4. Create testing DB if it does not exist ─────────────────
 echo ""
 echo "[4/10] Ensuring testing database exists..."
-psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'ecareafrica_testing'" | grep -q 1 \
-  || psql -U postgres -c "CREATE DATABASE ecareafrica_testing OWNER postgres;"
+# Use -h 127.0.0.1 to force TCP connection (avoids peer auth on socket)
+# Read password from the .env file so this works regardless of server config
+DB_PASS=$(grep '^DATABASE_URL=' "$BACKEND_DIR/.env" | sed 's/.*:\([^:@]*\)@.*/\1/')
+PGPASSWORD="$DB_PASS" psql -U postgres -h 127.0.0.1 -tc \
+  "SELECT 1 FROM pg_database WHERE datname = 'ecareafrica_testing'" \
+  | grep -q 1 \
+  || PGPASSWORD="$DB_PASS" psql -U postgres -h 127.0.0.1 \
+       -c "CREATE DATABASE ecareafrica_testing OWNER postgres;"
 echo "✓ Database ecareafrica_testing ready"
 
 # ── 5. Backend: install, prisma, build ───────────────────────
