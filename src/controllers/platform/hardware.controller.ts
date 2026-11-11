@@ -346,7 +346,11 @@ export const proxyRenameDeviceUser = async (req: Request, res: Response) => {
 export const proxyPushStudents = async (req: Request, res: Response) => {
   const { schoolId } = await resolveTabletForProxy(req.params.id);
   const { studentIds } = req.body;
-  const result = await tabletService.pushStudentsToDevice(req.params.id, schoolId, studentIds);
+  // Build input compatible with the existing pushStudentsToDevice signature
+  const input = studentIds?.length
+    ? { mode: 'selected' as const, student_ids: studentIds }
+    : { mode: 'all' as const };
+  const result = await tabletService.pushStudentsToDevice(req.params.id, schoolId, input as any);
   res.json(successResponse(result));
 };
 
