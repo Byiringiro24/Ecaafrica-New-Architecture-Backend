@@ -208,6 +208,49 @@ npx prisma generate --schema src/models/schema.prisma
 npx prisma migrate deploy --schema src/models/schema.prisma
 echo "✓ Prisma ready (all migrations applied)"
 
+# ── Safety: apply critical columns that may be missing if DB was ──
+# cloned from an older dump (migration marked applied but column absent)
+echo "  Applying safety column patches to $DB_NAME..."
+PGPASSWORD="$DB_PASS" psql -U postgres -h 127.0.0.1 -d "$DB_NAME" -q << 'SQLEOF'
+-- attendance_logs table (migration 20260705093000)
+CREATE TABLE IF NOT EXISTS "attendance_logs" (
+  "id" BIGSERIAL PRIMARY KEY,
+  "school_id" BIGINT,
+  "log_id" TEXT,
+  "user_id" TEXT,
+  "student_id" TEXT,
+  "student_device_id" TEXT,
+  "student_name" TEXT,
+  "class_name" TEXT,
+  "section" TEXT,
+  "device_id" TEXT,
+  "authentication_method" TEXT,
+  "direction" TEXT,
+  "timestamp" TIMESTAMPTZ,
+  "status" TEXT,
+  "attendance_period" TEXT,
+  "raw_data" JSONB,
+  "sync_state" VARCHAR(20) NOT NULL DEFAULT 'synced',
+  "is_flagged" BOOLEAN NOT NULL DEFAULT FALSE,
+  "flag_reason" VARCHAR(255),
+  "synced_at" TIMESTAMPTZ,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "attendance_logs_log_id_device_id_key"
+  ON "attendance_logs" ("log_id", "device_id");
+CREATE INDEX IF NOT EXISTS "attendance_logs_school_id_idx"
+  ON "attendance_logs" ("school_id");
+CREATE INDEX IF NOT EXISTS "attendance_logs_timestamp_idx"
+  ON "attendance_logs" ("timestamp");
+
+-- boarding_attendance_records.dormitory_id (migration 20261007000000)
+ALTER TABLE "boarding_attendance_records"
+  ADD COLUMN IF NOT EXISTS "dormitory_id" BIGINT;
+CREATE INDEX IF NOT EXISTS "boarding_attendance_records_dormitory_id_idx"
+  ON "boarding_attendance_records" ("dormitory_id");
+SQLEOF
+echo "✓ Safety patches applied"
+
 echo "  Building backend TypeScript..."
 npm run build
 echo "✓ Backend built → dist/server.js"

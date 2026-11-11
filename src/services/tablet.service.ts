@@ -698,9 +698,12 @@ export class TabletService {
     return client.setTime(datetime);
   }
 
-  async getDeviceUsers(id: string | number | bigint, schoolId: string | number | bigint) {
+  async getDeviceUsers(id: string | number | bigint, schoolId: string | number | bigint, deviceUid?: string | null) {
     const { client } = await this.getTabletClient(id, schoolId);
-    const result: any = await client.getUsers();
+    // Route to specific FK623 device if deviceUid is provided
+    const result: any = deviceUid
+      ? await client.getUsersFromDevice(deviceUid)
+      : await client.getUsers();
     const users = getTabletUsers(result);
     let savedCount = 0;
 
@@ -746,15 +749,19 @@ export class TabletService {
   async addDeviceUser(
     id: string | number | bigint,
     schoolId: string | number | bigint,
-    input: { userId: string; name: string; photoUrl?: string }
+    input: { userId: string; name: string; photoUrl?: string; deviceUid?: string | null }
   ) {
     const { client } = await this.getTabletClient(id, schoolId);
-    return client.addUser(input.userId, input.name, input.photoUrl);
+    return input.deviceUid
+      ? client.addUserToDevice(input.deviceUid, input.userId, input.name, input.photoUrl)
+      : client.addUser(input.userId, input.name, input.photoUrl);
   }
 
-  async deleteDeviceUser(id: string | number | bigint, schoolId: string | number | bigint, userId: string) {
+  async deleteDeviceUser(id: string | number | bigint, schoolId: string | number | bigint, userId: string, deviceUid?: string | null) {
     const { client } = await this.getTabletClient(id, schoolId);
-    return client.deleteUser(userId);
+    return deviceUid
+      ? client.deleteUserFromDevice(deviceUid, userId)
+      : client.deleteUser(userId);
   }
 
   /**
@@ -1352,14 +1359,19 @@ export class TabletService {
     };
   }
 
-  async clearDeviceLogs(id: string | number | bigint, schoolId: string | number | bigint) {
+  async clearDeviceLogs(id: string | number | bigint, schoolId: string | number | bigint, deviceUid?: string | null) {
     const { client } = await this.getTabletClient(id, schoolId);
-    return client.clearLogs();
+    return deviceUid
+      ? client.clearLogsOnDevice(deviceUid)
+      : client.clearLogs();
   }
 
-  async clearDeviceData(id: string | number | bigint, schoolId: string | number | bigint) {
+  async clearDeviceData(id: string | number | bigint, schoolId: string | number | bigint, deviceUid?: string | null) {
     const { client } = await this.getTabletClient(id, schoolId);
-    return client.clearAll();
+    // Route to specific FK623 — each device has its own user/log database
+    return deviceUid
+      ? client.clearAllOnDevice(deviceUid)
+      : client.clearAll();
   }
 
   async powerOffDevice(id: string | number | bigint, schoolId: string | number | bigint) {

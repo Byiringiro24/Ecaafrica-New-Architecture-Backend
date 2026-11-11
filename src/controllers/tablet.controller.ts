@@ -151,19 +151,24 @@ export async function setTabletDeviceTime(req: Request, res: Response) {
 
 export async function pullTabletDeviceUsers(req: Request, res: Response) {
   const schoolId = resolveSchoolId(req);
-  const result = await tabletService.getDeviceUsers(req.params.id, schoolId);
+  // deviceUid: optional query param — routes to specific FK623 on multi-device tablets
+  const deviceUid = (req.query.deviceUid as string) || null;
+  const result = await tabletService.getDeviceUsers(req.params.id, schoolId, deviceUid);
   res.json(successResponse({ data: result }));
 }
 
 export async function addTabletDeviceUser(req: Request, res: Response) {
   const schoolId = resolveSchoolId(req);
-  const result = await tabletService.addDeviceUser(req.params.id, schoolId, req.body);
+  // deviceUid may come from body or query
+  const deviceUid = (req.body.deviceUid as string) || (req.query.deviceUid as string) || null;
+  const result = await tabletService.addDeviceUser(req.params.id, schoolId, { ...req.body, deviceUid });
   res.json(successResponse(result));
 }
 
 export async function deleteTabletDeviceUser(req: Request, res: Response) {
   const schoolId = resolveSchoolId(req);
-  const result = await tabletService.deleteDeviceUser(req.params.id, schoolId, req.params.userId);
+  const deviceUid = (req.query.deviceUid as string) || null;
+  const result = await tabletService.deleteDeviceUser(req.params.id, schoolId, req.params.userId, deviceUid);
   res.json(successResponse(result));
 }
 
@@ -185,13 +190,15 @@ export async function pushTabletDeviceStudents(req: Request, res: Response) {
 
 export async function clearTabletDeviceLogs(req: Request, res: Response) {
   const schoolId = resolveSchoolId(req);
-  const result = await tabletService.clearDeviceLogs(req.params.id, schoolId);
+  const deviceUid = (req.query.deviceUid as string) || null;
+  const result = await tabletService.clearDeviceLogs(req.params.id, schoolId, deviceUid);
   res.json(successResponse(result));
 }
 
 export async function clearTabletDeviceData(req: Request, res: Response) {
   const schoolId = resolveSchoolId(req);
-  const result = await tabletService.clearDeviceData(req.params.id, schoolId);
+  const deviceUid = (req.query.deviceUid as string) || null;
+  const result = await tabletService.clearDeviceData(req.params.id, schoolId, deviceUid);
   res.json(successResponse(result));
 }
 

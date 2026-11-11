@@ -316,6 +316,34 @@ export class TabletClientService {
     }
   }
 
+  /**
+   * Clear ALL users + logs on a SPECIFIC FK623 device by its bridge device-config ID.
+   * Each FK623 has its own user database — this only wipes the targeted device.
+   */
+  async clearAllOnDevice(deviceConfigId: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await this.client.post(`/api/devices-config/${deviceConfigId}/clear-all`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error clearing device ${deviceConfigId}:`, (error as Error).message);
+      throw this.handleError(error as AxiosError);
+    }
+  }
+
+  /**
+   * Get users from a SPECIFIC FK623 device by its bridge device-config ID.
+   * Already exists as getUsersFromDevice — alias for consistency.
+   */
+  async clearLogsOnDevice(deviceConfigId: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await this.client.post(`/api/devices-config/${deviceConfigId}/clear-logs`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error clearing logs on device ${deviceConfigId}:`, (error as Error).message);
+      throw this.handleError(error as AxiosError);
+    }
+  }
+
   async powerOff(): Promise<{ success: boolean; message?: string }> {
     try {
       const response = await this.client.post('/api/device/poweroff');
