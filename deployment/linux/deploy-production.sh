@@ -10,8 +10,8 @@
 
 set -e
 
-BACKEND_REPO="https://github.com/MbarushimanaFabrice/Ecareafrica_backend.git"
-FRONTEND_REPO="https://github.com/MbarushimanaFabrice/Ecareafrica_frontend.git"
+BACKEND_REPO="https://github.com/Byiringiro24/Ecaafrica-New-Architecture-Backend.git"
+FRONTEND_REPO="https://github.com/Byiringiro24/Ecaafrica-New-Architecture-Frontend.git"
 BACKEND_BRANCH="main"
 FRONTEND_BRANCH="main"
 BACKEND_DIR="/var/www/ecare/backend"
