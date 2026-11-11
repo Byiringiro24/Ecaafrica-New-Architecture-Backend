@@ -70,69 +70,80 @@ else
 fi
 echo "✓ Backend pulled — $(git log --oneline -1)"
 
-# ── 3. Write backend .env for TESTING ────────────────────────
+# ── 3. Merge backend .env for TESTING (never overwrite existing keys) ─
+# merge_env KEY VALUE FILE
+#   - If FILE does not exist → creates it with KEY=VALUE
+#   - If KEY already present in FILE → leaves it untouched (existing value wins)
+#   - If KEY is missing from FILE → appends KEY=VALUE
+merge_env() {
+  local key="$1" value="$2" file="$3"
+  if [ ! -f "$file" ]; then
+    echo "$key=$value" >> "$file"
+  elif ! grep -qE "^${key}=" "$file"; then
+    echo "$key=$value" >> "$file"
+    echo "  + added missing key: $key"
+  fi
+}
+
 echo ""
-echo "[3/10] Writing backend .env (testing)..."
-cat > "$BACKEND_DIR/.env" << 'ENVEOF'
-DATABASE_URL="postgresql://postgres:2211@localhost:5432/ecareafrica_testing?schema=public"
+echo "[3/10] Merging backend .env (testing — existing keys preserved)..."
+ENV_FILE="$BACKEND_DIR/.env"
 
-JWT_SECRET=1b1a90a340949c666a212b212de76a9c7e14d24a5cd9c6b1de32d517668501b1
-JWT_REFRESH_SECRET=hk3BkIhG-cEMddfdK3FIGsAgRL_16mQWxKDgnaRvdRwzbWC9ICwhQO0Kashg-DQEWjCnKz3tpxaG-K9Y2gyHrg
-PLATFORM_JWT_SECRET=Gqwfm4cF1q3S2uX5nvdRkUZRQU40ZmcGRCBs4H666mgez6mNaU5iS7Mhjo3wSvKssqV2Sa0B7sFOk49181MEEw
-PLATFORM_JWT_REFRESH_SECRET=CL3gr3UNYYqfdcs8zdzvbMWkLn3rFRQn_BbkxOfOgFy1
-JWT_EXPIRES_IN=15m
-JWT_REFRESH_EXPIRES_IN=7d
+if [ -f "$ENV_FILE" ]; then
+  echo "  ✓ Existing .env found — only adding missing keys"
+else
+  echo "  ✓ No .env found — creating fresh one"
+fi
 
-PORT=5501
-NODE_ENV=production
-TZ=Africa/Kigali
-TRUST_PROXY=true
+merge_env "DATABASE_URL"                 '"postgresql://postgres:2211@localhost:5432/ecareafrica_testing?schema=public"' "$ENV_FILE"
+merge_env "JWT_SECRET"                   "1b1a90a340949c666a212b212de76a9c7e14d24a5cd9c6b1de32d517668501b1"             "$ENV_FILE"
+merge_env "JWT_REFRESH_SECRET"           "hk3BkIhG-cEMddfdK3FIGsAgRL_16mQWxKDgnaRvdRwzbWC9ICwhQO0Kashg-DQEWjCnKz3tpxaG-K9Y2gyHrg" "$ENV_FILE"
+merge_env "PLATFORM_JWT_SECRET"          "Gqwfm4cF1q3S2uX5nvdRkUZRQU40ZmcGRCBs4H666mgez6mNaU5iS7Mhjo3wSvKssqV2Sa0B7sFOk49181MEEw" "$ENV_FILE"
+merge_env "PLATFORM_JWT_REFRESH_SECRET"  "CL3gr3UNYYqfdcs8zdzvbMWkLn3rFRQn_BbkxOfOgFy1"                               "$ENV_FILE"
+merge_env "JWT_EXPIRES_IN"               "15m"                                                                          "$ENV_FILE"
+merge_env "JWT_REFRESH_EXPIRES_IN"       "7d"                                                                           "$ENV_FILE"
+merge_env "PORT"                         "$BACKEND_PORT"                                                                "$ENV_FILE"
+merge_env "NODE_ENV"                     "production"                                                                   "$ENV_FILE"
+merge_env "TZ"                           "Africa/Kigali"                                                                "$ENV_FILE"
+merge_env "TRUST_PROXY"                  "true"                                                                         "$ENV_FILE"
+merge_env "CORS_ORIGIN"                  "http://testing.ecareafrica.net,https://testing.ecareafrica.net,http://testing-api.ecareafrica.net,https://testing-api.ecareafrica.net" "$ENV_FILE"
+merge_env "RATE_LIMIT_ENABLED"           "false"                                                                        "$ENV_FILE"
+merge_env "RATE_LIMIT_WINDOW_MS"         "900000"                                                                       "$ENV_FILE"
+merge_env "RATE_LIMIT_MAX"               "200"                                                                          "$ENV_FILE"
+merge_env "S3_ENDPOINT"                  "https://abcd1234efgh.r2.cloudflarestorage.com"                               "$ENV_FILE"
+merge_env "S3_REGION"                    "auto"                                                                         "$ENV_FILE"
+merge_env "S3_BUCKET"                    "ecareafrica-storage"                                                          "$ENV_FILE"
+merge_env "S3_ACCESS_KEY_ID"             "RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g"                             "$ENV_FILE"
+merge_env "S3_SECRET_ACCESS_KEY"         "RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g"                             "$ENV_FILE"
+merge_env "S3_PUBLIC_URL"                "https://pub.r2.dev"                                                           "$ENV_FILE"
+merge_env "SMTP_HOST"                    "smtp.gmail.com"                                                               "$ENV_FILE"
+merge_env "SMTP_PORT"                    "587"                                                                          "$ENV_FILE"
+merge_env "SMTP_USER"                    "netrackdevelopement@gmail.com"                                                "$ENV_FILE"
+merge_env "SMTP_PASS"                    "elkrdmcpmksazazy"                                                             "$ENV_FILE"
+merge_env "SMTP_FROM"                    "netrackdevelopement@gmail.com"                                                "$ENV_FILE"
+merge_env "REDIS_URL"                    "redis://localhost:6379"                                                       "$ENV_FILE"
+merge_env "SMS_UGANDA_API_URL"           "http://text.emediauganda.com/api.php"                                        "$ENV_FILE"
+merge_env "SMS_UGANDA_USER"              "your_username"                                                                "$ENV_FILE"
+merge_env "SMS_UGANDA_PASSWORD"          "your_password"                                                                "$ENV_FILE"
+merge_env "SMS_UGANDA_SENDER"            "EducationCare"                                                                "$ENV_FILE"
+merge_env "APP_BASE_URL"                 "https://testing.ecareafrica.net"                                             "$ENV_FILE"
+merge_env "WG_CONF_PATH"                 "/etc/wireguard/wg0.conf"                                                     "$ENV_FILE"
+merge_env "WG_PUBKEY_PATH"               "/etc/wireguard/server_public.key"                                            "$ENV_FILE"
+merge_env "WG_INTERFACE"                 "wg0"                                                                          "$ENV_FILE"
+merge_env "VPN_SUBNET"                   "10.0"                                                                         "$ENV_FILE"
+merge_env "VPN_CIDR"                     "16"                                                                           "$ENV_FILE"
+merge_env "SERVER_VPN_IP"                "10.0.0.1"                                                                    "$ENV_FILE"
+merge_env "SERVER_PUBLIC_IP"             "169.58.124.150"                                                               "$ENV_FILE"
+merge_env "WG_PORT"                      "51820"                                                                        "$ENV_FILE"
+merge_env "PULL_CONCURRENCY"             "10"                                                                           "$ENV_FILE"
+merge_env "PULL_LOGS_INTERVAL_MS"        "5000"                                                                         "$ENV_FILE"
+merge_env "PULL_TIMEOUT_MS"              "20000"                                                                        "$ENV_FILE"
+merge_env "SSE_CONNECT_CONCURRENCY"      "10"                                                                           "$ENV_FILE"
+merge_env "SSE_CONNECT_STAGGER_MS"       "200"                                                                          "$ENV_FILE"
+merge_env "SSE_DEDUP_CACHE_SIZE"         "10000"                                                                        "$ENV_FILE"
 
-CORS_ORIGIN=http://testing.ecareafrica.net,https://testing.ecareafrica.net,http://testing-api.ecareafrica.net,https://testing-api.ecareafrica.net
-
-RATE_LIMIT_ENABLED=false
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX=200
-
-S3_ENDPOINT=https://abcd1234efgh.r2.cloudflarestorage.com
-S3_REGION=auto
-S3_BUCKET=ecareafrica-storage
-S3_ACCESS_KEY_ID=RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g
-S3_SECRET_ACCESS_KEY=RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g
-S3_PUBLIC_URL=https://pub.r2.dev
-
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=netrackdevelopement@gmail.com
-SMTP_PASS=elkrdmcpmksazazy
-SMTP_FROM=netrackdevelopement@gmail.com
-
-REDIS_URL=redis://localhost:6379
-
-SMS_UGANDA_API_URL=http://text.emediauganda.com/api.php
-SMS_UGANDA_USER=your_username
-SMS_UGANDA_PASSWORD=your_password
-SMS_UGANDA_SENDER=EducationCare
-
-APP_BASE_URL=https://testing.ecareafrica.net
-
-WG_CONF_PATH=/etc/wireguard/wg0.conf
-WG_PUBKEY_PATH=/etc/wireguard/server_public.key
-WG_INTERFACE=wg0
-VPN_SUBNET=10.0
-VPN_CIDR=16
-SERVER_VPN_IP=10.0.0.1
-SERVER_PUBLIC_IP=169.58.124.150
-WG_PORT=51820
-
-PULL_CONCURRENCY=10
-PULL_LOGS_INTERVAL_MS=5000
-PULL_TIMEOUT_MS=20000
-SSE_CONNECT_CONCURRENCY=10
-SSE_CONNECT_STAGGER_MS=200
-SSE_DEDUP_CACHE_SIZE=10000
-ENVEOF
-echo "✓ Backend .env written (PORT=$BACKEND_PORT, DB=ecareafrica_testing)"
+echo "✓ .env merge complete — existing values untouched"
+echo "  Active DATABASE_URL: $(grep '^DATABASE_URL=' "$ENV_FILE" | head -1)"
 
 # ── 4. Create testing DB if it does not exist ─────────────────
 echo ""
