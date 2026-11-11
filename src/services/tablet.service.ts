@@ -774,6 +774,7 @@ export class TabletService {
       orderBy: { updated_at: 'desc' },
       select: {
         id: true,
+        device_uid: true,  // used to route pull-logs to the specific FK623 on this tablet
         attendance_config: true,
         mode: true,
         dormitory_id: true,
@@ -853,9 +854,15 @@ export class TabletService {
     }
 
     // ── Pull logs ────────────────────────────────────────────────────────────
+    // Route through /api/devices-config/:deviceUid/pull-logs when device_uid is
+    // known — this ensures each FK623 on a multi-device laptop is polled separately.
+    // Fall back to /api/device/pull-logs (single-device path) when device_uid is not set.
+    const bridgeDeviceId = deviceForConnect?.device_uid ?? null;
     let result: any;
     try {
-      result = await client.pullLogs(readMark);
+      result = bridgeDeviceId
+        ? await client.pullLogsForDevice(bridgeDeviceId, readMark)
+        : await client.pullLogs(readMark);
     } catch (pullErr) {
       const msg = (pullErr as Error).message ?? '';
 
@@ -877,7 +884,9 @@ export class TabletService {
               data: { is_connected: true, last_connection_at: new Date(), connection_error: null },
             });
           }
-          result = await client.pullLogs(readMark);
+          result = bridgeDeviceId
+            ? await client.pullLogsForDevice(bridgeDeviceId, readMark)
+            : await client.pullLogs(readMark);
         } catch (retryErr) {
           const retryMsg = (retryErr as Error).message ?? '';
           if (/FK_LoadGeneralLogData|failed: -3|failed: -/i.test(retryMsg)) {

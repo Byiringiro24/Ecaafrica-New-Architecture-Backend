@@ -55,16 +55,52 @@ export class TabletClientService {
     }
   }
 
+  /**
+   * Pull logs from a SPECIFIC FK623 device by its bridge device-config ID.
+   * Use this when a laptop has multiple FK623 units connected.
+   * The bridge routes the GET_LOGS command to the correct device's FKBridge.exe instance.
+   */
+  async pullLogsForDevice(deviceConfigId: string, readMark: number = 0): Promise<FK623PullLogsResponse> {
+    try {
+      const response = await this.client.post(`/api/devices-config/${deviceConfigId}/pull-logs`, {
+        readMark,
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error pulling logs from device ${deviceConfigId}:`, (error as Error).message);
+      throw this.handleError(error as AxiosError);
+    }
+  }
+
   async addUser(userId: string, name: string, photoUrl?: string): Promise<FK623AddUserResponse> {
     try {
       const response = await this.client.post('/api/device/users', {
         userId,
         name,
-        photoUrl: photoUrl ?? null,   // tablet stores this for display on scan
+        photoUrl: photoUrl ?? null,
       });
       return response.data;
     } catch (error) {
       console.error('Error adding user to device:', (error as Error).message);
+      throw this.handleError(error as AxiosError);
+    }
+  }
+
+  /**
+   * Add a user to a SPECIFIC FK623 device by its bridge device-config ID.
+   * Use this when a laptop has multiple FK623 units — each device has its own
+   * user database and biometric templates.
+   */
+  async addUserToDevice(deviceConfigId: string, userId: string, name: string, photoUrl?: string): Promise<FK623AddUserResponse> {
+    try {
+      const response = await this.client.post(`/api/devices-config/${deviceConfigId}/users`, {
+        userId,
+        name,
+        photoUrl: photoUrl ?? null,
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error adding user to device ${deviceConfigId}:`, (error as Error).message);
       throw this.handleError(error as AxiosError);
     }
   }
@@ -75,6 +111,58 @@ export class TabletClientService {
       return response.data;
     } catch (error) {
       console.error('Error deleting user from device:', (error as Error).message);
+      throw this.handleError(error as AxiosError);
+    }
+  }
+
+  /**
+   * Delete a user from a SPECIFIC FK623 device by its bridge device-config ID.
+   */
+  async deleteUserFromDevice(deviceConfigId: string, userId: string): Promise<FK623DeleteUserResponse> {
+    try {
+      const response = await this.client.delete(`/api/devices-config/${deviceConfigId}/users/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting user from device ${deviceConfigId}:`, (error as Error).message);
+      throw this.handleError(error as AxiosError);
+    }
+  }
+
+  /**
+   * Get users from a SPECIFIC FK623 device by its bridge device-config ID.
+   */
+  async getUsersFromDevice(deviceConfigId: string): Promise<FK623GetUsersResponse> {
+    try {
+      const response = await this.client.get(`/api/devices-config/${deviceConfigId}/users`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error getting users from device ${deviceConfigId}:`, (error as Error).message);
+      throw this.handleError(error as AxiosError);
+    }
+  }
+
+  /**
+   * Clear logs on a SPECIFIC FK623 device by its bridge device-config ID.
+   */
+  async clearLogsOnDevice(deviceConfigId: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await this.client.post(`/api/devices-config/${deviceConfigId}/clear-logs`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error clearing logs on device ${deviceConfigId}:`, (error as Error).message);
+      throw this.handleError(error as AxiosError);
+    }
+  }
+
+  /**
+   * Sync time on a SPECIFIC FK623 device by its bridge device-config ID.
+   */
+  async syncTimeOnDevice(deviceConfigId: string): Promise<FK623SyncTimeResponse> {
+    try {
+      const response = await this.client.post(`/api/devices-config/${deviceConfigId}/sync-time`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error syncing time on device ${deviceConfigId}:`, (error as Error).message);
       throw this.handleError(error as AxiosError);
     }
   }

@@ -724,6 +724,11 @@ export const pushStudentsToDevice = async (
   const pushed: Array<{ id: string; user_id: string; name: string }> = [];
   const failed: Array<{ id: string; user_id: string; name: string; error: string }> = [];
 
+  // If the device has a device_uid (bridge device-config ID), route through the
+  // device-specific endpoint so each FK623 is treated independently.
+  // Fall back to the single-device path only when device_uid is not set.
+  const bridgeDeviceId = device.device_uid ?? null;
+
   for (const student of studentsWithDeviceUserIds) {
     const userId = student.device_user_id;
     if (!userId) {
@@ -739,7 +744,9 @@ export const pushStudentsToDevice = async (
 
     try {
       const result = await withTabletOfflineRetry(
-        () => tabletClient.addUser(userId, name),
+        () => bridgeDeviceId
+          ? tabletClient.addUserToDevice(bridgeDeviceId, userId, name)
+          : tabletClient.addUser(userId, name),
         { timeoutMs: 5 * 60 * 1000, retryIntervalMs: 2000 }
       );
       if (result && (result as any).success === false) {
@@ -858,6 +865,9 @@ export const removeStudentsFromDevice = async (
   const removed: Array<{ id: string; user_id: string; name: string }> = [];
   const failed: Array<{ id: string; user_id: string; name: string; error: string }> = [];
 
+  // Route through the device-specific endpoint when device_uid is set
+  const bridgeDeviceId = device.device_uid ?? null;
+
   for (const student of students) {
     const userId = student.device_user_id;
     if (!userId) {
@@ -872,7 +882,11 @@ export const removeStudentsFromDevice = async (
     const name = `${student.first_name} ${student.last_name}`.trim();
 
     try {
-      await tabletClient.deleteUser(userId);
+      if (bridgeDeviceId) {
+        await tabletClient.deleteUserFromDevice(bridgeDeviceId, userId);
+      } else {
+        await tabletClient.deleteUser(userId);
+      }
       removed.push({ id: student.id.toString(), user_id: userId, name });
       // Clear sync status so student no longer shows as synced to any device
       await prisma.students.update({
