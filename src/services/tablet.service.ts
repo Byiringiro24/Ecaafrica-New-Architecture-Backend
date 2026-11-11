@@ -234,7 +234,7 @@ export class TabletService {
 
     let status: TabletStatus = TabletStatus.ONLINE;
     try {
-      const client = new TabletClientService(url);
+      const client = new TabletClientService(url, (tablet as any)?.dev_password || undefined);
       await client.health();
     } catch (error) {
       status = TabletStatus.OFFLINE;
@@ -410,7 +410,7 @@ export class TabletService {
     let version: string | undefined;
 
     try {
-      const client = new TabletClientService(tablet.url);
+      const client = new TabletClientService(tablet.url, (tablet as any)?.dev_password || undefined);
       const result = await client.health();
       healthy = true;
       version = result.version;
@@ -516,7 +516,7 @@ export class TabletService {
 
     return {
       tablet,
-      client: new TabletClientService(url),
+      client: new TabletClientService(url, (tablet as any).dev_password || undefined),
     };
   }
 
@@ -755,6 +755,22 @@ export class TabletService {
   async deleteDeviceUser(id: string | number | bigint, schoolId: string | number | bigint, userId: string) {
     const { client } = await this.getTabletClient(id, schoolId);
     return client.deleteUser(userId);
+  }
+
+  /**
+   * Rename a user on the FK623 device (delete + re-add with new name).
+   */
+  async renameDeviceUser(id: string | number | bigint, schoolId: string | number | bigint, userId: string, newName: string) {
+    const { client } = await this.getTabletClient(id, schoolId);
+    return client.renameUser(userId, newName);
+  }
+
+  /**
+   * Push all (or selected) students to the FK623 device via the tablet bridge.
+   */
+  async pushStudentsToDevice(id: string | number | bigint, schoolId: string | number | bigint, studentIds?: string[]) {
+    const { client } = await this.getTabletClient(id, schoolId);
+    return client.pushStudents(studentIds);
   }
 
   async pullDeviceLogs(id: string | number | bigint, schoolId: string | number | bigint, readMark = 0) {

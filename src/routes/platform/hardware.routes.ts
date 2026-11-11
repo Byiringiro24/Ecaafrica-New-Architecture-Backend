@@ -114,3 +114,24 @@ hardwareRoutes.post("/vpn/ensure-up", asyncWrapper(vpnController.ensureVpnUp));
 
 // Build the WireGuard .conf content the tablet needs to import
 hardwareRoutes.post("/vpn/build-config", asyncWrapper(vpnController.buildTabletConfig));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PLATFORM DEVICE PROXY — /tablets/:id/device/*
+// Super admin controls FK623 devices over WireGuard VPN via the tablet bridge.
+// All routes resolve school_id from the tablet's DB record.
+// ═══════════════════════════════════════════════════════════════════════════════
+import * as hwCtrl from "../../controllers/platform/hardware.controller";
+
+hardwareRoutes.get("/tablets/:id/device/status", validate({ params: idParamSchema }), asyncWrapper(hwCtrl.proxyDeviceStatus));
+hardwareRoutes.post("/tablets/:id/device/connect", validate({ params: idParamSchema }), asyncWrapper(hwCtrl.proxyDeviceConnect));
+hardwareRoutes.post("/tablets/:id/device/disconnect", validate({ params: idParamSchema }), asyncWrapper(hwCtrl.proxyDeviceDisconnect));
+hardwareRoutes.get("/tablets/:id/device/users", validate({ params: idParamSchema }), asyncWrapper(hwCtrl.proxyGetDeviceUsers));
+hardwareRoutes.post("/tablets/:id/device/users", validate({ params: idParamSchema }), asyncWrapper(hwCtrl.proxyAddDeviceUser));
+hardwareRoutes.delete("/tablets/:id/device/users/:userId", asyncWrapper(hwCtrl.proxyDeleteDeviceUser));
+hardwareRoutes.patch("/tablets/:id/device/users/:userId", asyncWrapper(hwCtrl.proxyRenameDeviceUser));
+hardwareRoutes.post("/tablets/:id/device/push-students", validate({ params: idParamSchema }), asyncWrapper(hwCtrl.proxyPushStudents));
+hardwareRoutes.post("/tablets/:id/device/pull-logs", validate({ params: idParamSchema }), asyncWrapper(hwCtrl.proxyPullLogs));
+hardwareRoutes.post("/tablets/:id/device/sync-time", validate({ params: idParamSchema }), asyncWrapper(hwCtrl.proxySyncTime));
+hardwareRoutes.post("/tablets/:id/device/clear-logs", validate({ params: idParamSchema }), asyncWrapper(hwCtrl.proxyClearLogs));
+hardwareRoutes.post("/tablets/:id/device/clear-all", validate({ params: idParamSchema }), asyncWrapper(hwCtrl.proxyClearAll));
+hardwareRoutes.post("/tablets/:id/device/poweroff", validate({ params: idParamSchema }), asyncWrapper(hwCtrl.proxyPowerOff));

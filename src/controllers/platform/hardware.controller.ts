@@ -268,3 +268,120 @@ export const getTabletDevPassword = async (req: import("express").Request, res: 
     setAt: (tablet as any).dev_password_set_at,
   }));
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PLATFORM DEVICE PROXY — /platform/hardware/tablets/:id/device/*
+// Super admin controls FK623 devices over WireGuard VPN via the tablet bridge.
+// Resolves school_id from the tablet's DB record (not from req.user).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Helper: resolve tablet + schoolId from the DB for platform-auth proxy */
+async function resolveTabletForProxy(tabletId: string) {
+  const tablet = await prisma.tablets.findFirst({
+    where: { id: toBigInt(tabletId), deleted_at: null },
+  });
+  if (!tablet) throw new AppError("not_found", "Tablet not found", 404);
+  return { tablet, schoolId: tablet.school_id };
+}
+
+/** GET /platform/hardware/tablets/:id/device/status */
+export const proxyDeviceStatus = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const result = await tabletService.getDeviceStatus(req.params.id, schoolId);
+  res.json(successResponse(result));
+};
+
+/** POST /platform/hardware/tablets/:id/device/connect */
+export const proxyDeviceConnect = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const result = await tabletService.connectDevice(req.params.id, schoolId, req.body);
+  res.json(successResponse(result));
+};
+
+/** POST /platform/hardware/tablets/:id/device/disconnect */
+export const proxyDeviceDisconnect = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const result = await tabletService.disconnectDevice(req.params.id, schoolId);
+  res.json(successResponse(result));
+};
+
+/** GET /platform/hardware/tablets/:id/device/users */
+export const proxyGetDeviceUsers = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const result = await tabletService.getDeviceUsers(req.params.id, schoolId);
+  res.json(successResponse(result));
+};
+
+/** POST /platform/hardware/tablets/:id/device/users — add user */
+export const proxyAddDeviceUser = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const { userId, name, photoUrl } = req.body;
+  if (!userId) throw new AppError("bad_request", "userId is required", 400);
+  if (!name) throw new AppError("bad_request", "name is required", 400);
+  const result = await tabletService.addDeviceUser(req.params.id, schoolId, { userId, name, photoUrl });
+  res.status(201).json(successResponse(result));
+};
+
+/** DELETE /platform/hardware/tablets/:id/device/users/:userId */
+export const proxyDeleteDeviceUser = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const userId = req.params.userId;
+  if (!userId) throw new AppError("bad_request", "userId is required", 400);
+  const result = await tabletService.deleteDeviceUser(req.params.id, schoolId, userId);
+  res.json(successResponse(result));
+};
+
+/** PATCH /platform/hardware/tablets/:id/device/users/:userId — rename user */
+export const proxyRenameDeviceUser = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const userId = req.params.userId;
+  const { name } = req.body;
+  if (!userId) throw new AppError("bad_request", "userId is required", 400);
+  if (!name) throw new AppError("bad_request", "name is required", 400);
+  const result = await tabletService.renameDeviceUser(req.params.id, schoolId, userId, name);
+  res.json(successResponse(result));
+};
+
+/** POST /platform/hardware/tablets/:id/device/push-students */
+export const proxyPushStudents = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const { studentIds } = req.body;
+  const result = await tabletService.pushStudentsToDevice(req.params.id, schoolId, studentIds);
+  res.json(successResponse(result));
+};
+
+/** POST /platform/hardware/tablets/:id/device/pull-logs */
+export const proxyPullLogs = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const readMark = req.body?.readMark === 1 ? 1 : 0;
+  const result = await tabletService.pullDeviceLogs(req.params.id, schoolId, readMark);
+  res.json(successResponse(result));
+};
+
+/** POST /platform/hardware/tablets/:id/device/sync-time */
+export const proxySyncTime = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const result = await tabletService.syncTime(req.params.id, schoolId);
+  res.json(successResponse(result));
+};
+
+/** POST /platform/hardware/tablets/:id/device/clear-logs */
+export const proxyClearLogs = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const result = await tabletService.clearDeviceLogs(req.params.id, schoolId);
+  res.json(successResponse(result));
+};
+
+/** POST /platform/hardware/tablets/:id/device/clear-all */
+export const proxyClearAll = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const result = await tabletService.clearDeviceData(req.params.id, schoolId);
+  res.json(successResponse(result));
+};
+
+/** POST /platform/hardware/tablets/:id/device/poweroff */
+export const proxyPowerOff = async (req: Request, res: Response) => {
+  const { schoolId } = await resolveTabletForProxy(req.params.id);
+  const result = await tabletService.powerOffDevice(req.params.id, schoolId);
+  res.json(successResponse(result));
+};

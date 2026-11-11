@@ -18,16 +18,29 @@ const API_TIMEOUT = parseInt(process.env.TABLET_API_TIMEOUT || '15000', 10);
 export class TabletClientService {
   private baseURL: string;
   private client: AxiosInstance;
+  private devPassword: string | null;
 
-  constructor(tabletUrl: string) {
+  constructor(tabletUrl: string, devPassword?: string | null) {
     this.baseURL = tabletUrl;
+    this.devPassword = devPassword ?? null;
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: API_TIMEOUT,
       headers: {
         'Content-Type': 'application/json',
+        ...(devPassword ? { 'X-Dev-Password': devPassword } : {}),
       },
     });
+  }
+
+  /** Update the dev password at runtime (e.g. after the tablet polls a new one) */
+  setDevPassword(pw: string | null) {
+    this.devPassword = pw;
+    if (pw) {
+      this.client.defaults.headers['X-Dev-Password'] = pw;
+    } else {
+      delete this.client.defaults.headers['X-Dev-Password'];
+    }
   }
 
   async pullLogs(readMark: number = 0): Promise<FK623PullLogsResponse> {
@@ -62,6 +75,40 @@ export class TabletClientService {
       return response.data;
     } catch (error) {
       console.error('Error deleting user from device:', (error as Error).message);
+      throw this.handleError(error as AxiosError);
+    }
+  }
+
+  /**
+   * Rename a user on the FK623 device.
+   * The FK623 SDK has no UPDATE command — we delete and re-add with the new name.
+   * Biometric templates are preserved by the device hardware.
+   */
+  async renameUser(userId: string, newName: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Delete the old user entry
+      await this.client.delete(`/api/device/users/${userId}`);
+      // Re-add with the new name
+      const response = await this.client.post('/api/device/users', { userId, name: newName });
+      return response.data;
+    } catch (error) {
+      console.error('Error renaming user on device:', (error as Error).message);
+      throw this.handleError(error as AxiosError);
+    }
+  }
+
+  /**
+   * Push all (or selected) students to the FK623 device.
+   * The bridge enrolls each student by their device user ID + name.
+   */
+  async pushStudents(studentIds?: string[]): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const response = await this.client.post('/api/device/push-students', {
+        ...(studentIds ? { studentIds } : {}),
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error pushing students to device:', (error as Error).message);
       throw this.handleError(error as AxiosError);
     }
   }
