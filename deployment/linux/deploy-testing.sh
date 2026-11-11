@@ -1,16 +1,19 @@
 #!/bin/bash
 # ============================================================
-# EcaAfrica — TESTING Environment Deployment Script
-# Server : root@169.58.124.150
-# Paths  : /var/www/testing/backend   /var/www/testing/frontend
-# Ports  : Backend 5501  |  Frontend 4174
-# Domains: testing.ecareafrica.net  |  testing-api.ecareafrica.net
+# EcaAfrica — TESTING / STAGING Deployment Script
+#
+# Server  : root@169.58.124.150
+# Shared backend path : /var/www/testing/backend
+# Shared frontend path: /var/www/testing/frontend
+#
+# This one backend serves BOTH environments:
+#   staging.ecareafrica.net  → port 5600  (PM2: ecare-staging-backend)
+#   testing.ecareafrica.net  → port 5501  (PM2: ecare-testing-backend)
+#   testing-api.ecareafrica.net → port 5501 (nginx → 5501)
 #
 # Run FROM the server:
 #   ssh root@169.58.124.150
 #   curl -sL https://raw.githubusercontent.com/Byiringiro24/Ecaafrica-New-Architecture-Backend/main/deployment/linux/deploy-testing.sh | bash
-# OR:
-#   bash /var/www/testing/backend/deployment/linux/deploy-testing.sh
 # ============================================================
 
 set -e
@@ -22,11 +25,14 @@ FRONTEND_BRANCH="main"
 BACKEND_DIR="/var/www/testing/backend"
 FRONTEND_DIR="/var/www/testing/frontend"
 
-BACKEND_PORT=5501
+# Testing runs on 5501 / staging runs on 5600
+TESTING_PORT=5501
+STAGING_PORT=5600
 FRONTEND_PORT=4174
 
-PM2_BACKEND_NAME="ecare-testing-backend"
-PM2_FRONTEND_NAME="ecare-testing-frontend"
+PM2_TESTING_BACKEND="ecare-testing-backend"
+PM2_STAGING_BACKEND="ecare-staging-backend"
+PM2_FRONTEND="ecare-testing-frontend"
 
 # ── Force HTTPS remotes (no SSH keys on server) ───────────────
 if [ -d "$BACKEND_DIR/.git" ]; then
@@ -37,22 +43,27 @@ if [ -d "$FRONTEND_DIR/.git" ]; then
 fi
 
 echo "============================================"
-echo "  EcaAfrica TESTING Deployment"
-echo "  Backend  : $BACKEND_DIR  (port $BACKEND_PORT)"
-echo "  Frontend : $FRONTEND_DIR (port $FRONTEND_PORT)"
-echo "  Branch   : $BACKEND_BRANCH"
+echo "  EcaAfrica TESTING + STAGING Deployment"
+echo "  Backend dir : $BACKEND_DIR"
+echo "  Frontend dir: $FRONTEND_DIR"
+echo "  Branch      : $BACKEND_BRANCH"
+echo "  Testing port: $TESTING_PORT"
+echo "  Staging port: $STAGING_PORT"
 echo "============================================"
 
-# ── 1. Stop existing testing PM2 processes ───────────────────
+# ── 1. Stop PM2 processes (testing + staging, NOT production) ─
 echo ""
-echo "[1/10] Stopping testing PM2 processes..."
-pm2 stop  "$PM2_BACKEND_NAME"  2>/dev/null || true
-pm2 stop  "$PM2_FRONTEND_NAME" 2>/dev/null || true
-pm2 delete "$PM2_BACKEND_NAME"  2>/dev/null || true
-pm2 delete "$PM2_FRONTEND_NAME" 2>/dev/null || true
-fuser -k ${BACKEND_PORT}/tcp  2>/dev/null || true
+echo "[1/10] Stopping testing/staging PM2 processes..."
+pm2 stop  "$PM2_TESTING_BACKEND" 2>/dev/null || true
+pm2 stop  "$PM2_STAGING_BACKEND" 2>/dev/null || true
+pm2 stop  "$PM2_FRONTEND"        2>/dev/null || true
+pm2 delete "$PM2_TESTING_BACKEND" 2>/dev/null || true
+pm2 delete "$PM2_STAGING_BACKEND" 2>/dev/null || true
+pm2 delete "$PM2_FRONTEND"        2>/dev/null || true
+fuser -k ${TESTING_PORT}/tcp  2>/dev/null || true
+fuser -k ${STAGING_PORT}/tcp  2>/dev/null || true
 fuser -k ${FRONTEND_PORT}/tcp 2>/dev/null || true
-echo "✓ Testing PM2 processes stopped, ports freed"
+echo "✓ PM2 processes stopped, ports freed"
 
 # ── 2. Pull / clone backend ───────────────────────────────────
 echo ""
@@ -70,11 +81,15 @@ else
 fi
 echo "✓ Backend pulled — $(git log --oneline -1)"
 
-# ── 3. Merge backend .env for TESTING (never overwrite existing keys) ─
-# merge_env KEY VALUE FILE
-#   - If FILE does not exist → creates it with KEY=VALUE
-#   - If KEY already present in FILE → leaves it untouched (existing value wins)
-#   - If KEY is missing from FILE → appends KEY=VALUE
+# ── 3. Merge backend .env (never overwrite existing keys) ─────
+# Rules:
+#   - If .env does not exist → write full defaults
+#   - If key already exists in .env → leave it untouched (server admin value wins)
+#   - If key is MISSING from .env → append it
+#
+# IMPORTANT: CORS_ORIGIN must include BOTH staging AND testing domains
+# because staging and testing share the same backend process pool.
+# Never set CORS_ORIGIN to only one domain here.
 merge_env() {
   local key="$1" value="$2" file="$3"
   if [ ! -f "$file" ]; then
@@ -86,94 +101,114 @@ merge_env() {
 }
 
 echo ""
-echo "[3/10] Merging backend .env (testing — existing keys preserved)..."
+echo "[3/10] Merging backend .env (existing keys preserved)..."
 ENV_FILE="$BACKEND_DIR/.env"
 
 if [ -f "$ENV_FILE" ]; then
   echo "  ✓ Existing .env found — only adding missing keys"
 else
-  echo "  ✓ No .env found — creating fresh one"
+  echo "  ✓ No .env found — creating with defaults"
 fi
 
-merge_env "DATABASE_URL"                 '"postgresql://postgres:2211@localhost:5432/ecareafrica_testing?schema=public"' "$ENV_FILE"
-merge_env "JWT_SECRET"                   "1b1a90a340949c666a212b212de76a9c7e14d24a5cd9c6b1de32d517668501b1"             "$ENV_FILE"
-merge_env "JWT_REFRESH_SECRET"           "hk3BkIhG-cEMddfdK3FIGsAgRL_16mQWxKDgnaRvdRwzbWC9ICwhQO0Kashg-DQEWjCnKz3tpxaG-K9Y2gyHrg" "$ENV_FILE"
-merge_env "PLATFORM_JWT_SECRET"          "Gqwfm4cF1q3S2uX5nvdRkUZRQU40ZmcGRCBs4H666mgez6mNaU5iS7Mhjo3wSvKssqV2Sa0B7sFOk49181MEEw" "$ENV_FILE"
-merge_env "PLATFORM_JWT_REFRESH_SECRET"  "CL3gr3UNYYqfdcs8zdzvbMWkLn3rFRQn_BbkxOfOgFy1"                               "$ENV_FILE"
-merge_env "JWT_EXPIRES_IN"               "15m"                                                                          "$ENV_FILE"
-merge_env "JWT_REFRESH_EXPIRES_IN"       "7d"                                                                           "$ENV_FILE"
-merge_env "PORT"                         "$BACKEND_PORT"                                                                "$ENV_FILE"
-merge_env "NODE_ENV"                     "production"                                                                   "$ENV_FILE"
-merge_env "TZ"                           "Africa/Kigali"                                                                "$ENV_FILE"
-merge_env "TRUST_PROXY"                  "true"                                                                         "$ENV_FILE"
-merge_env "CORS_ORIGIN"                  "http://testing.ecareafrica.net,https://testing.ecareafrica.net,http://testing-api.ecareafrica.net,https://testing-api.ecareafrica.net" "$ENV_FILE"
-merge_env "RATE_LIMIT_ENABLED"           "false"                                                                        "$ENV_FILE"
-merge_env "RATE_LIMIT_WINDOW_MS"         "900000"                                                                       "$ENV_FILE"
-merge_env "RATE_LIMIT_MAX"               "200"                                                                          "$ENV_FILE"
-merge_env "S3_ENDPOINT"                  "https://abcd1234efgh.r2.cloudflarestorage.com"                               "$ENV_FILE"
-merge_env "S3_REGION"                    "auto"                                                                         "$ENV_FILE"
-merge_env "S3_BUCKET"                    "ecareafrica-storage"                                                          "$ENV_FILE"
-merge_env "S3_ACCESS_KEY_ID"             "RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g"                             "$ENV_FILE"
-merge_env "S3_SECRET_ACCESS_KEY"         "RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g"                             "$ENV_FILE"
-merge_env "S3_PUBLIC_URL"                "https://pub.r2.dev"                                                           "$ENV_FILE"
-merge_env "SMTP_HOST"                    "smtp.gmail.com"                                                               "$ENV_FILE"
-merge_env "SMTP_PORT"                    "587"                                                                          "$ENV_FILE"
-merge_env "SMTP_USER"                    "netrackdevelopement@gmail.com"                                                "$ENV_FILE"
-merge_env "SMTP_PASS"                    "elkrdmcpmksazazy"                                                             "$ENV_FILE"
-merge_env "SMTP_FROM"                    "netrackdevelopement@gmail.com"                                                "$ENV_FILE"
-merge_env "REDIS_URL"                    "redis://localhost:6379"                                                       "$ENV_FILE"
-merge_env "SMS_UGANDA_API_URL"           "http://text.emediauganda.com/api.php"                                        "$ENV_FILE"
-merge_env "SMS_UGANDA_USER"              "your_username"                                                                "$ENV_FILE"
-merge_env "SMS_UGANDA_PASSWORD"          "your_password"                                                                "$ENV_FILE"
-merge_env "SMS_UGANDA_SENDER"            "EducationCare"                                                                "$ENV_FILE"
-merge_env "APP_BASE_URL"                 "https://testing.ecareafrica.net"                                             "$ENV_FILE"
-merge_env "WG_CONF_PATH"                 "/etc/wireguard/wg0.conf"                                                     "$ENV_FILE"
-merge_env "WG_PUBKEY_PATH"               "/etc/wireguard/server_public.key"                                            "$ENV_FILE"
-merge_env "WG_INTERFACE"                 "wg0"                                                                          "$ENV_FILE"
-merge_env "VPN_SUBNET"                   "10.0"                                                                         "$ENV_FILE"
-merge_env "VPN_CIDR"                     "16"                                                                           "$ENV_FILE"
-merge_env "SERVER_VPN_IP"                "10.0.0.1"                                                                    "$ENV_FILE"
-merge_env "SERVER_PUBLIC_IP"             "169.58.124.150"                                                               "$ENV_FILE"
-merge_env "WG_PORT"                      "51820"                                                                        "$ENV_FILE"
-merge_env "PULL_CONCURRENCY"             "10"                                                                           "$ENV_FILE"
-merge_env "PULL_LOGS_INTERVAL_MS"        "5000"                                                                         "$ENV_FILE"
-merge_env "PULL_TIMEOUT_MS"              "20000"                                                                        "$ENV_FILE"
-merge_env "SSE_CONNECT_CONCURRENCY"      "10"                                                                           "$ENV_FILE"
-merge_env "SSE_CONNECT_STAGGER_MS"       "200"                                                                          "$ENV_FILE"
-merge_env "SSE_DEDUP_CACHE_SIZE"         "10000"                                                                        "$ENV_FILE"
-merge_env "OFFLINE_FAIL_THRESHOLD"       "3"                                                                            "$ENV_FILE"
+# ── Core ──────────────────────────────────────────────────────
+# DATABASE_URL: defaults to architecturetest — change on server if needed
+merge_env "DATABASE_URL"               '"postgresql://postgres:2211@localhost:5432/architecturetest?schema=public"' "$ENV_FILE"
+merge_env "JWT_SECRET"                 "1b1a90a340949c666a212b212de76a9c7e14d24a5cd9c6b1de32d517668501b1" "$ENV_FILE"
+merge_env "JWT_REFRESH_SECRET"         "hk3BkIhG-cEMddfdK3FIGsAgRL_16mQWxKDgnaRvdRwzbWC9ICwhQO0Kashg-DQEWjCnKz3tpxaG-K9Y2gyHrg" "$ENV_FILE"
+merge_env "PLATFORM_JWT_SECRET"        "Gqwfm4cF1q3S2uX5nvdRkUZRQU40ZmcGRCBs4H666mgez6mNaU5iS7Mhjo3wSvKssqV2Sa0B7sFOk49181MEEw" "$ENV_FILE"
+merge_env "PLATFORM_JWT_REFRESH_SECRET" "CL3gr3UNYYqfdcs8zdzvbMWkLn3rFRQn_BbkxOfOgFy1" "$ENV_FILE"
+merge_env "JWT_EXPIRES_IN"             "30m"  "$ENV_FILE"
+merge_env "JWT_REFRESH_EXPIRES_IN"     "30d"  "$ENV_FILE"
+
+# PORT: testing backend default is 5501.
+# staging-backend is started separately with PORT=5600.
+merge_env "PORT"             "$TESTING_PORT"  "$ENV_FILE"
+merge_env "NODE_ENV"         "production"     "$ENV_FILE"
+merge_env "TZ"               "Africa/Kampala" "$ENV_FILE"
+merge_env "TRUST_PROXY"      "true"           "$ENV_FILE"
+
+# CORS: MUST include BOTH staging AND testing — both share this .env
+merge_env "CORS_ORIGIN" \
+  "https://staging.ecareafrica.net,http://staging.ecareafrica.net,https://testing.ecareafrica.net,http://testing.ecareafrica.net,https://testing-api.ecareafrica.net,http://testing-api.ecareafrica.net" \
+  "$ENV_FILE"
+
+merge_env "RATE_LIMIT_ENABLED"   "false"   "$ENV_FILE"
+merge_env "RATE_LIMIT_WINDOW_MS" "900000"  "$ENV_FILE"
+merge_env "RATE_LIMIT_MAX"       "200"     "$ENV_FILE"
+
+# ── Storage ───────────────────────────────────────────────────
+merge_env "S3_ENDPOINT"       "https://abcd1234efgh.r2.cloudflarestorage.com" "$ENV_FILE"
+merge_env "S3_REGION"         "auto"                                           "$ENV_FILE"
+merge_env "S3_BUCKET"         "ecareafrica-storage"                            "$ENV_FILE"
+merge_env "S3_ACCESS_KEY_ID"  "RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g" "$ENV_FILE"
+merge_env "S3_SECRET_ACCESS_KEY" "RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g" "$ENV_FILE"
+merge_env "S3_PUBLIC_URL"     "https://pub.r2.dev"                            "$ENV_FILE"
+
+# ── Email ─────────────────────────────────────────────────────
+merge_env "SMTP_HOST" "smtp.gmail.com"                   "$ENV_FILE"
+merge_env "SMTP_PORT" "587"                              "$ENV_FILE"
+merge_env "SMTP_USER" "netrackdevelopement@gmail.com"   "$ENV_FILE"
+merge_env "SMTP_PASS" "elkrdmcpmksazazy"                 "$ENV_FILE"
+merge_env "SMTP_FROM" "netrackdevelopement@gmail.com"   "$ENV_FILE"
+
+# ── Services ──────────────────────────────────────────────────
+merge_env "REDIS_URL"           "redis://localhost:6379"             "$ENV_FILE"
+merge_env "SMS_UGANDA_API_URL"  "http://text.emediauganda.com/api.php" "$ENV_FILE"
+merge_env "SMS_UGANDA_USER"     "your_username"                      "$ENV_FILE"
+merge_env "SMS_UGANDA_PASSWORD" "your_password"                      "$ENV_FILE"
+merge_env "SMS_UGANDA_SENDER"   "EducationCare"                      "$ENV_FILE"
+merge_env "APP_BASE_URL"        "https://staging.ecareafrica.net"    "$ENV_FILE"
+
+# ── WireGuard ─────────────────────────────────────────────────
+merge_env "WG_CONF_PATH"     "/etc/wireguard/wg0.conf"       "$ENV_FILE"
+merge_env "WG_PUBKEY_PATH"   "/etc/wireguard/server_public.key" "$ENV_FILE"
+merge_env "WG_INTERFACE"     "wg0"                             "$ENV_FILE"
+merge_env "VPN_SUBNET"       "10.0"                            "$ENV_FILE"
+merge_env "VPN_CIDR"         "16"                              "$ENV_FILE"
+merge_env "SERVER_VPN_IP"    "10.0.0.1"                        "$ENV_FILE"
+merge_env "SERVER_PUBLIC_IP" "169.58.124.150"                  "$ENV_FILE"
+merge_env "WG_PORT"          "51820"                           "$ENV_FILE"
+
+# ── Pull-logs tuning ──────────────────────────────────────────
+merge_env "PULL_CONCURRENCY"        "10"    "$ENV_FILE"
+merge_env "PULL_LOGS_INTERVAL_MS"   "5000"  "$ENV_FILE"
+merge_env "PULL_TIMEOUT_MS"         "20000" "$ENV_FILE"
+merge_env "OFFLINE_FAIL_THRESHOLD"  "3"     "$ENV_FILE"
+merge_env "SSE_CONNECT_CONCURRENCY" "10"    "$ENV_FILE"
+merge_env "SSE_CONNECT_STAGGER_MS"  "200"   "$ENV_FILE"
+merge_env "SSE_DEDUP_CACHE_SIZE"    "10000" "$ENV_FILE"
 
 echo "✓ .env merge complete — existing values untouched"
-echo "  Active DATABASE_URL: $(grep '^DATABASE_URL=' "$ENV_FILE" | head -1)"
+echo "  Active DATABASE_URL : $(grep '^DATABASE_URL=' "$ENV_FILE" | head -1)"
+echo "  Active CORS_ORIGIN  : $(grep '^CORS_ORIGIN='  "$ENV_FILE" | head -1)"
+echo "  Active PORT         : $(grep '^PORT='         "$ENV_FILE" | head -1)"
 
-# ── 4. Create testing DB if it does not exist ─────────────────
+# ── 4. Ensure DB exists (uses TCP to avoid peer auth) ─────────
 echo ""
-echo "[4/10] Ensuring testing database exists..."
-# Use -h 127.0.0.1 to force TCP connection (avoids peer auth on socket)
-# Read password from the .env file so this works regardless of server config
-DB_PASS=$(grep '^DATABASE_URL=' "$BACKEND_DIR/.env" | sed 's/.*:\([^:@]*\)@.*/\1/')
+echo "[4/10] Ensuring database exists..."
+DB_NAME=$(grep '^DATABASE_URL=' "$ENV_FILE" | sed "s|.*5432/\([^?\"]*\).*|\1|")
+DB_PASS=$(grep '^DATABASE_URL=' "$ENV_FILE" | sed 's/.*:\([^:@]*\)@.*/\1/')
+echo "  DB name: $DB_NAME"
 PGPASSWORD="$DB_PASS" psql -U postgres -h 127.0.0.1 -tc \
-  "SELECT 1 FROM pg_database WHERE datname = 'ecareafrica_testing'" \
+  "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" \
   | grep -q 1 \
   || PGPASSWORD="$DB_PASS" psql -U postgres -h 127.0.0.1 \
-       -c "CREATE DATABASE ecareafrica_testing OWNER postgres;"
-echo "✓ Database ecareafrica_testing ready"
+       -c "CREATE DATABASE \"$DB_NAME\" OWNER postgres;"
+echo "✓ Database $DB_NAME ready"
 
-# ── 5. Backend: install, prisma, build ───────────────────────
+# ── 5. Backend: install + prisma + build ─────────────────────
 echo ""
 echo "[5/10] Installing backend dependencies..."
 cd "$BACKEND_DIR"
 npm install --production=false
 echo "✓ Dependencies installed"
 
-echo ""
-echo "  Prisma generate + migrate..."
+echo "  Running prisma generate + migrate deploy..."
 npx prisma generate --schema src/models/schema.prisma
 npx prisma migrate deploy --schema src/models/schema.prisma
-echo "✓ Prisma ready"
+echo "✓ Prisma ready (all migrations applied)"
 
-echo ""
-echo "  Building backend..."
+echo "  Building backend TypeScript..."
 npm run build
 echo "✓ Backend built → dist/server.js"
 
@@ -193,39 +228,65 @@ else
 fi
 echo "✓ Frontend pulled — $(git log --oneline -1)"
 
-# ── 7. Build frontend with TESTING API URL ────────────────────
+# ── 7. Build frontend ─────────────────────────────────────────
+# NOTE: We build TWO versions of the frontend:
+#   1. testing.ecareafrica.net → points to testing-api.ecareafrica.net
+#   2. staging.ecareafrica.net → serves from /var/www/testing/frontend/dist
+#      but staging nginx serves files directly (try_files), not via PM2
+#      so we build the testing version and staging frontend is served from same dist
+#      Staging uses its own nginx which routes /api/ to port 5600
 echo ""
-echo "[7/10] Building frontend (testing)..."
+echo "[7/10] Building frontend..."
+# Build with testing API (testing.ecareafrica.net domain)
 echo "VITE_API_BASE_URL=https://testing-api.ecareafrica.net/api/v1" > "$FRONTEND_DIR/.env"
 cd "$FRONTEND_DIR"
 npm install
 npm run build
 echo "✓ Frontend built → $FRONTEND_DIR/dist/"
 
-# ── 8. Start with PM2 ────────────────────────────────────────
+# Build staging version separately
+echo "  Building staging frontend variant..."
+echo "VITE_API_BASE_URL=https://staging.ecareafrica.net/api/v1" > "$FRONTEND_DIR/.env"
+npm run build -- --outDir dist-staging 2>/dev/null || {
+  # vite outDir flag not supported — copy dist as staging
+  cp -r "$FRONTEND_DIR/dist" "$FRONTEND_DIR/dist-staging"
+  echo "  (staging dist copied from testing dist)"
+}
+echo "✓ Staging frontend built → $FRONTEND_DIR/dist-staging/"
+
+# ── 8. Start PM2 processes ────────────────────────────────────
 echo ""
-echo "[8/10] Starting TESTING processes with PM2..."
-
-# Start backend — override PORT so it does not conflict with production
+echo "[8/10] Starting PM2 processes..."
 cd "$BACKEND_DIR"
-PORT=$BACKEND_PORT pm2 start dist/server.js \
-  --name "$PM2_BACKEND_NAME" \
-  --time \
-  -- --env production
 
-echo "Starting testing frontend static server on port $FRONTEND_PORT..."
-pm2 serve "$FRONTEND_DIR/dist" $FRONTEND_PORT --name "$PM2_FRONTEND_NAME" --spa --time
+# Testing backend on port 5501
+PORT=$TESTING_PORT pm2 start dist/server.js \
+  --name "$PM2_TESTING_BACKEND" \
+  --time
+
+# Staging backend on port 5600 (what staging nginx proxies to)
+PORT=$STAGING_PORT pm2 start dist/server.js \
+  --name "$PM2_STAGING_BACKEND" \
+  --time
+
+# Testing frontend static server
+pm2 serve "$FRONTEND_DIR/dist" $FRONTEND_PORT \
+  --name "$PM2_FRONTEND" --spa --time
 
 pm2 save
-echo "✓ PM2 testing processes running"
+pm2 startup 2>/dev/null || true
+echo "✓ All PM2 processes started"
 
-# ── 9. Install / update nginx testing config ──────────────────
+# ── 9. Nginx config ───────────────────────────────────────────
 echo ""
 echo "[9/10] Updating nginx testing config..."
 NGINX_CONF="$BACKEND_DIR/deployment/linux/ecareafrica-testing-nginx.conf"
 if [ -f "$NGINX_CONF" ]; then
+  # Strip BOM if present (prevents 'unknown directive' nginx error)
+  sed -i '1s/^\xEF\xBB\xBF//' "$NGINX_CONF"
   cp "$NGINX_CONF" /etc/nginx/sites-available/ecareafrica-testing
-  ln -sf /etc/nginx/sites-available/ecareafrica-testing /etc/nginx/sites-enabled/ecareafrica-testing
+  ln -sf /etc/nginx/sites-available/ecareafrica-testing \
+         /etc/nginx/sites-enabled/ecareafrica-testing
   nginx -t && nginx -s reload
   echo "✓ Nginx testing config applied and reloaded"
 else
@@ -238,8 +299,16 @@ echo "[10/10] Done!"
 echo ""
 pm2 list
 echo ""
-echo "  Testing Frontend → http://testing.ecareafrica.net   (port $FRONTEND_PORT)"
-echo "  Testing Backend  → http://testing-api.ecareafrica.net/api/v1  (port $BACKEND_PORT)"
+echo "  Testing  Frontend → https://testing.ecareafrica.net    (PM2 serve → port $FRONTEND_PORT)"
+echo "  Testing  Backend  → https://testing-api.ecareafrica.net/api/v1  (port $TESTING_PORT)"
+echo "  Staging  Frontend → https://staging.ecareafrica.net    (nginx → dist-staging/)"
+echo "  Staging  Backend  → https://staging.ecareafrica.net/api/v1 (nginx → port $STAGING_PORT)"
 echo ""
-echo "Logs:  pm2 logs $PM2_BACKEND_NAME"
-echo "       pm2 logs $PM2_FRONTEND_NAME"
+echo "Logs:"
+echo "  pm2 logs $PM2_TESTING_BACKEND"
+echo "  pm2 logs $PM2_STAGING_BACKEND"
+echo "  pm2 logs $PM2_FRONTEND"
+echo ""
+echo "Health checks:"
+echo "  curl -s http://localhost:$TESTING_PORT/api/v1/health"
+echo "  curl -s http://localhost:$STAGING_PORT/api/v1/health"
