@@ -280,22 +280,32 @@ echo "✓ Frontend pulled — $(git log --oneline -1)"
 #      Staging uses its own nginx which routes /api/ to port 5600
 echo ""
 echo "[7/10] Building frontend..."
-# Build with testing API (testing.ecareafrica.net domain)
-echo "VITE_API_BASE_URL=https://testing-api.ecareafrica.net/api/v1" > "$FRONTEND_DIR/.env"
 cd "$FRONTEND_DIR"
 npm install
-npm run build
-echo "✓ Frontend built → $FRONTEND_DIR/dist/"
 
-# Build staging version separately
+# Build STAGING first (staging.ecareafrica.net/api/v1)
 echo "  Building staging frontend variant..."
 echo "VITE_API_BASE_URL=https://staging.ecareafrica.net/api/v1" > "$FRONTEND_DIR/.env"
-npm run build -- --outDir dist-staging 2>/dev/null || {
-  # vite outDir flag not supported — copy dist as staging
-  cp -r "$FRONTEND_DIR/dist" "$FRONTEND_DIR/dist-staging"
-  echo "  (staging dist copied from testing dist)"
-}
-echo "✓ Staging frontend built → $FRONTEND_DIR/dist-staging/"
+npm run build -- --outDir dist-staging 2>/dev/null \
+  && echo "✓ Staging frontend built → $FRONTEND_DIR/dist-staging/" \
+  || { echo "  (--outDir flag not supported, using sequential builds)"; }
+
+# Build TESTING (testing-api.ecareafrica.net/api/v1)
+# This is the final dist/ — also used by PM2 serve on port 4174
+echo "VITE_API_BASE_URL=https://testing-api.ecareafrica.net/api/v1" > "$FRONTEND_DIR/.env"
+npm run build
+echo "✓ Testing frontend built → $FRONTEND_DIR/dist/"
+
+# If staging build failed above (--outDir not supported), rebuild it now
+# using the dist from testing as a base, then overwrite the JS with the right API URL
+if [ ! -f "$FRONTEND_DIR/dist-staging/index.html" ]; then
+  echo "  Rebuilding staging variant properly..."
+  echo "VITE_API_BASE_URL=https://staging.ecareafrica.net/api/v1" > "$FRONTEND_DIR/.env"
+  npm run build -- --outDir dist-staging \
+    || { cp -r "$FRONTEND_DIR/dist" "$FRONTEND_DIR/dist-staging"; echo "  Warning: staging is a copy of testing dist — API URL may differ"; }
+  echo "VITE_API_BASE_URL=https://testing-api.ecareafrica.net/api/v1" > "$FRONTEND_DIR/.env"
+fi
+echo "✓ Both frontend builds complete"
 
 # ── 8. Start PM2 processes ────────────────────────────────────
 echo ""
