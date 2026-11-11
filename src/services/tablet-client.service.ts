@@ -330,20 +330,6 @@ export class TabletClientService {
     }
   }
 
-  /**
-   * Get users from a SPECIFIC FK623 device by its bridge device-config ID.
-   * Already exists as getUsersFromDevice — alias for consistency.
-   */
-  async clearLogsOnDevice(deviceConfigId: string): Promise<{ success: boolean; message?: string }> {
-    try {
-      const response = await this.client.post(`/api/devices-config/${deviceConfigId}/clear-logs`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error clearing logs on device ${deviceConfigId}:`, (error as Error).message);
-      throw this.handleError(error as AxiosError);
-    }
-  }
-
   async powerOff(): Promise<{ success: boolean; message?: string }> {
     try {
       const response = await this.client.post('/api/device/poweroff');
