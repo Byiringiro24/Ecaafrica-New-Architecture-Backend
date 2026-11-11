@@ -136,6 +136,7 @@ merge_env "PULL_TIMEOUT_MS"              "20000"                                
 merge_env "SSE_CONNECT_CONCURRENCY"      "10"                                                                           "$ENV_FILE"
 merge_env "SSE_CONNECT_STAGGER_MS"       "200"                                                                          "$ENV_FILE"
 merge_env "SSE_DEDUP_CACHE_SIZE"         "10000"                                                                        "$ENV_FILE"
+merge_env "OFFLINE_FAIL_THRESHOLD"       "3"                                                                            "$ENV_FILE"
 
 echo "✓ .env merge complete — existing values untouched"
 echo "  Active DATABASE_URL: $(grep '^DATABASE_URL=' "$ENV_FILE" | head -1)"
@@ -190,9 +191,6 @@ echo ""
 echo "[8/10] Starting backend with PM2 (ecosystem.config.js)..."
 cd "$BACKEND_DIR"
 pm2 start ecosystem.config.js --env production
-
-echo "Starting frontend static server on port 4173..."
-pm2 serve "$FRONTEND_DIR/dist" 4173 --name "ecare-frontend" --spa --time
 
 pm2 save
 pm2 startup 2>/dev/null || true

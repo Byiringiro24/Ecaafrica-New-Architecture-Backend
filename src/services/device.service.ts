@@ -325,16 +325,19 @@ const formatDeviceWithStatus = async (
 ) => {
   const { pin_hash: _pinHash, ...rest } = record;
   const lastSeenAt = record.last_seen_at ? new Date(record.last_seen_at) : null;
-  // 90-second grace window — bridge-sse updates last_seen_at on every scan,
-  // pull-logs job updates every 5s. 90s = enough buffer for one missed sweep.
-  // Extended to 10 minutes so devices don't flicker offline between pull sweeps
-  // when no student has scanned recently (e.g. overnight, weekends).
-  const recentHeartbeat = lastSeenAt ? Date.now() - lastSeenAt.getTime() < 600_000 : false;
+  // 2-minute grace window — pull-logs job runs every 5 s and marks offline after
+  // 3 consecutive failures (~15 s). 2 minutes gives plenty of buffer for one
+  // missed sweep without keeping stale "online" counts for hours.
+  const recentHeartbeat = lastSeenAt ? Date.now() - lastSeenAt.getTime() < 120_000 : false;
 
-  // Also treat the device as online if the linked tablet's status is 'online'
-  // in the DB — this is updated by bridge-sse and pull-logs independently of
-  // last_seen_at, so it catches the case where the tablet is connected and
-  // sending logs but no scan has happened in the last 90 seconds.
+  // Trust the DB is_connected field written by the pull-logs job.
+  // The job now explicitly sets is_connected=false when a tablet is unreachable,
+  // so this field is authoritative — do NOT recalculate it from last_seen_at.
+  const dbIsConnected = record.is_connected === true;
+
+  // Also trust tablet.status='online' set by pull-logs on success.
+  // But only if it was recently confirmed — tablet.status can be stale on its
+  // own, so we pair it with the new is_connected field or a recent heartbeat.
   const tabletOnline = (record.tablet as any)?.status === 'online';
 
   let isOnline = false;
@@ -342,19 +345,19 @@ const formatDeviceWithStatus = async (
   let status = "offline";
 
   if (checkRealTimeStatus) {
-    // If the bridge is reachable, the device is effectively healthy and should stay online
-    // even when the last heartbeat is slightly stale or the FK device flag has not refreshed yet.
+    // Live check — ping the bridge directly
     const bridgeReachable = await checkTabletReachability(resolveTabletBridgeUrl(record));
-    const fkConnected = Boolean(record.is_connected);
 
-    isConnected = bridgeReachable || fkConnected || recentHeartbeat || tabletOnline;
+    isConnected = bridgeReachable || dbIsConnected || recentHeartbeat;
     isOnline = isConnected;
     status = isOnline ? "online" : "offline";
   } else {
-    // Fallback to last_seen_at timestamp OR tablet.status field.
-    // tablet.status='online' is set by bridge-sse on every scan event and by
-    // pull-logs on every successful pull — more reliable than last_seen_at alone.
-    isOnline = recentHeartbeat || tabletOnline;
+    // Cached path — trust DB fields written by pull-logs job:
+    //   is_connected=true  → job confirmed reachable on last pull
+    //   is_connected=false → job explicitly marked unreachable after threshold
+    //   recentHeartbeat    → last_seen_at within 2 minutes (fallback for new devices)
+    // We do NOT use tablet.status alone because it may be stale (never auto-expires).
+    isOnline = dbIsConnected || recentHeartbeat;
     isConnected = isOnline;
     status = isOnline ? "online" : "offline";
   }

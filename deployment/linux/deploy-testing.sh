@@ -141,6 +141,7 @@ merge_env "PULL_TIMEOUT_MS"              "20000"                                
 merge_env "SSE_CONNECT_CONCURRENCY"      "10"                                                                           "$ENV_FILE"
 merge_env "SSE_CONNECT_STAGGER_MS"       "200"                                                                          "$ENV_FILE"
 merge_env "SSE_DEDUP_CACHE_SIZE"         "10000"                                                                        "$ENV_FILE"
+merge_env "OFFLINE_FAIL_THRESHOLD"       "3"                                                                            "$ENV_FILE"
 
 echo "✓ .env merge complete — existing values untouched"
 echo "  Active DATABASE_URL: $(grep '^DATABASE_URL=' "$ENV_FILE" | head -1)"

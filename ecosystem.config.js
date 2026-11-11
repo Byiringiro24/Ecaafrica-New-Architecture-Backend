@@ -43,8 +43,13 @@ module.exports = {
     },
     {
       name:      'ecare-frontend',
-      script:    'node_modules/.bin/serve',
-      args:      '-s dist -l 4173',
+      // Use npx serve so the 'serve' package does not need to be listed in
+      // package.json — npx downloads it on first run and caches it globally.
+      // This avoids the "[PM2][ERROR] Script not found: node_modules/.bin/serve"
+      // error that occurs when 'serve' is not installed as a local dependency.
+      script:    'npx',
+      args:      'serve -s dist -l 4173',
+      interpreter: 'none',
       instances: 1,
       exec_mode: 'fork',
       cwd:       '/var/www/ecare/frontend',

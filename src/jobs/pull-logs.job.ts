@@ -4,51 +4,52 @@
  * Runs on server startup and periodically pulls attendance logs from ALL active
  * tablets across every school. Designed to handle 100+ tablets safely:
  *
- *  - Pulls run in controlled batches (PULL_CONCURRENCY, default 10) so 100 tablets
- *    are not all hit simultaneously — avoids port exhaustion and server overload.
+ *  - Pulls run in controlled batches (PULL_CONCURRENCY, default 10).
  *  - Each tablet has an independent in-flight guard (no overlapping pulls).
- *  - Each tablet is staggered by a small random jitter within the batch so they
- *    don't all hit the same second.
- *  - Pull timeout is per-tablet — one slow tablet never blocks others.
- *  - SSE handles real-time delivery; this is the safety-net catch-up sweep.
+ *  - Per-tablet pull timeout prevents one slow tablet from blocking others.
+ *  - OFFLINE DETECTION: after OFFLINE_FAIL_THRESHOLD consecutive network
+ *    failures the tablet is marked offline in the DB and all its devices have
+ *    is_connected=false. A single success resets the counter and marks online.
+ *  - SSE handles real-time delivery; this job is the safety-net catch-up sweep.
  */
 
 import { prisma } from "../database/prisma";
 import tabletService from "../services/tablet.service";
 import { logger } from "../utils/logger";
 
-// How often to run a full sweep across all tablets (default: 5 s)
-const PULL_INTERVAL_MS = parseInt(
-  process.env.PULL_LOGS_INTERVAL_MS ?? String(5_000),
-  10
-);
+// ── Config ───────────────────────────────────────────────────────────────────
 
-// Maximum tablets to pull from in parallel per sweep cycle.
-// Lower = less server load. Higher = faster sweeps.
-// Tune via PULL_CONCURRENCY env var. Default: 10 (safe for 100+ tablets).
+// How often to run a full sweep across all tablets (default: 5 s)
+const PULL_INTERVAL_MS = parseInt(process.env.PULL_LOGS_INTERVAL_MS ?? "5000", 10);
+
+// Max parallel tablets per batch
 const PULL_CONCURRENCY = parseInt(process.env.PULL_CONCURRENCY ?? "10", 10);
 
-// Per-tablet pull timeout (must exceed tablet API timeout of 15 s)
+// Per-tablet pull timeout (must exceed tablet API timeout of ~15 s)
 const PULL_TIMEOUT_MS = parseInt(process.env.PULL_TIMEOUT_MS ?? "20000", 10);
 
-// Per-tablet in-flight guard — prevents overlapping pulls for the same tablet
+// Number of consecutive network failures before a tablet is marked offline.
+// At 5 s intervals: 3 failures = ~15 s of silence → mark offline.
+const OFFLINE_FAIL_THRESHOLD = parseInt(process.env.OFFLINE_FAIL_THRESHOLD ?? "3", 10);
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+// Per-tablet in-flight guard — prevents overlapping pulls
 const inFlight = new Set<string>();
 
-// Last successful pull time per tablet key (`${schoolId}-${tabletId}`)
+// Last pull attempt time per tablet key (`${schoolId}-${tabletId}`)
 const lastPullAt = new Map<string, number>();
+
+// Consecutive network-failure counter per tablet key
+const failCount = new Map<string, number>();
 
 // ── Concurrency limiter ──────────────────────────────────────────────────────
 
-/**
- * Run an array of async tasks in batches of `concurrency`.
- * Waits for each batch to settle before starting the next.
- * This caps simultaneous outbound HTTP connections regardless of fleet size.
- */
 async function runInBatches<T>(
   tasks: Array<() => Promise<T>>,
   concurrency: number
-): Promise<Array<{ status: "fulfilled"; value: T } | { status: "rejected"; reason: unknown }>> {
-  const results: Array<{ status: "fulfilled"; value: T } | { status: "rejected"; reason: unknown }> = [];
+): Promise<Array<PromiseSettledResult<T>>> {
+  const results: Array<PromiseSettledResult<T>> = [];
   for (let i = 0; i < tasks.length; i += concurrency) {
     const batch = tasks.slice(i, i + concurrency);
     const batchResults = await Promise.allSettled(batch.map((fn) => fn()));
@@ -74,10 +75,11 @@ async function pullForTablet(
     try {
       const result = await tabletService.pullDeviceLogs(tabletId, schoolId, 0);
 
-      // Update last_seen_at on all devices linked to this tablet
+      // ✓ Success — reset failure counter, update last_seen_at on all linked devices
+      failCount.set(key, 0);
       await prisma.devices.updateMany({
         where: { tablet_id: tabletId, school_id: schoolId },
-        data: { last_seen_at: new Date() },
+        data: { last_seen_at: new Date(), is_connected: true },
       });
 
       return {
@@ -100,6 +102,27 @@ async function pullForTablet(
   );
 
   return Promise.race([pullPromise, timeoutPromise]);
+}
+
+// ── Mark tablet + its devices offline ───────────────────────────────────────
+
+async function markTabletOffline(tabletId: bigint, tabletName: string, reason: string): Promise<void> {
+  try {
+    await prisma.tablets.update({
+      where: { id: tabletId },
+      data: { status: "offline", updated_at: new Date() },
+    });
+    await prisma.devices.updateMany({
+      where: { tablet_id: tabletId },
+      data: { is_connected: false, last_status_message: `Tablet unreachable: ${reason}` },
+    });
+    logger.warn(
+      { tabletId: tabletId.toString(), tabletName, reason },
+      "[pull-logs] Tablet marked OFFLINE after consecutive failures"
+    );
+  } catch (err) {
+    logger.error({ err, tabletId: tabletId.toString() }, "[pull-logs] Failed to write offline status");
+  }
 }
 
 // ── Full sweep ───────────────────────────────────────────────────────────────
@@ -142,17 +165,8 @@ async function runPullSweep(): Promise<void> {
     "[pull-logs] Starting sweep"
   );
 
-  // Build task functions (not yet invoked) — batched execution controls concurrency
   const tasks = due.map((tablet) => async () => {
     const key = `${tablet.school_id}-${tablet.id}`;
-
-    if (!tablet.ip && !tablet.url) {
-      logger.warn(
-        { tabletId: tablet.id.toString(), tabletName: tablet.name },
-        "[pull-logs] Skipping tablet — no IP or URL configured"
-      );
-      return;
-    }
 
     try {
       const summary = await pullForTablet(tablet.id, tablet.school_id);
@@ -170,26 +184,50 @@ async function runPullSweep(): Promise<void> {
         );
       }
 
-      // Mark tablet online
+      // ✓ Mark tablet online and clear failure counter
+      failCount.set(key, 0);
       await prisma.tablets
-        .update({ where: { id: tablet.id }, data: { status: "online", last_health_check: new Date(), updated_at: new Date() } })
+        .update({
+          where: { id: tablet.id },
+          data: { status: "online", last_health_check: new Date(), updated_at: new Date() },
+        })
         .catch(() => null);
 
     } catch (err) {
       const message = (err as Error).message ?? String(err);
-      const isNetwork = /ECONNREFUSED|ETIMEDOUT|ENOTFOUND|No response|Tablet unreachable/i.test(message);
+      const isNetwork = /ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EHOSTUNREACH|No response|Tablet unreachable|timed out/i.test(message);
 
       if (isNetwork) {
-        // Keep the tablet online when the network path is still healthy enough for the bridge to respond.
-        // A single failed pull is not enough evidence that the device is actually offline.
-        logger.warn({ tabletId: tablet.id.toString(), tabletName: tablet.name, error: message }, "[pull-logs] Pull failed transiently; keeping current status");
+        // Increment consecutive failure counter
+        const prev = failCount.get(key) ?? 0;
+        const next = prev + 1;
+        failCount.set(key, next);
+
+        logger.warn(
+          {
+            tabletId: tablet.id.toString(),
+            tabletName: tablet.name,
+            consecutiveFails: next,
+            threshold: OFFLINE_FAIL_THRESHOLD,
+            error: message,
+          },
+          `[pull-logs] Network failure #${next} for tablet`
+        );
+
+        // Only mark offline once the threshold is crossed
+        if (next >= OFFLINE_FAIL_THRESHOLD) {
+          await markTabletOffline(tablet.id, tablet.name, message);
+        }
       } else {
-        logger.warn({ err, tabletId: tablet.id.toString(), tabletName: tablet.name }, "[pull-logs] Pull failed for tablet");
+        // Non-network error (e.g. parsing, DB) — log but don't penalise connectivity counter
+        logger.warn(
+          { err, tabletId: tablet.id.toString(), tabletName: tablet.name },
+          "[pull-logs] Pull failed (non-network error)"
+        );
       }
     }
   });
 
-  // Execute in controlled batches — never more than PULL_CONCURRENCY at once
   await runInBatches(tasks, PULL_CONCURRENCY);
 }
 
@@ -201,7 +239,11 @@ export function startPullLogsJob(): void {
   if (sweepTimer) return;
 
   logger.info(
-    { intervalMs: PULL_INTERVAL_MS, concurrency: PULL_CONCURRENCY },
+    {
+      intervalMs: PULL_INTERVAL_MS,
+      concurrency: PULL_CONCURRENCY,
+      offlineThreshold: OFFLINE_FAIL_THRESHOLD,
+    },
     "[pull-logs] Auto-pull job started"
   );
 
