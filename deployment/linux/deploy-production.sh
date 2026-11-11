@@ -1,11 +1,15 @@
 #!/bin/bash
 # ============================================================
-# EcaAfrica — Full Deployment Script
+# EcaAfrica — PRODUCTION Deployment Script
 # Server: root@169.58.124.150
+# Paths : /var/www/ecare/backend   /var/www/ecare/frontend
+# Ports : Backend 5500  |  Frontend 4173
+#
 # Run FROM the server:
 #   ssh root@169.58.124.150
-#   curl -sL https://raw.githubusercontent.com/MbarushimanaFabrice/Ecareafrica_backend/main/deployment/linux/deploy-production.sh | bash
-# OR copy-paste this whole file then: bash deploy-to-server.sh
+#   curl -sL https://raw.githubusercontent.com/Byiringiro24/Ecaafrica-New-Architecture-Backend/main/deployment/linux/deploy-production.sh | bash
+# OR:
+#   bash /var/www/ecare/backend/deployment/linux/deploy-production.sh
 # ============================================================
 
 set -e
@@ -32,14 +36,17 @@ echo "  Backend  branch : $BACKEND_BRANCH"
 echo "  Frontend branch : $FRONTEND_BRANCH"
 echo "============================================"
 
-# ── 1. Stop PM2 ──────────────────────────────────────────────
+# ── 1. Stop production PM2 processes only ────────────────────
+# NOTE: we stop by name so testing processes (ecare-testing-*) are untouched
 echo ""
-echo "[1/10] Stopping PM2..."
-pm2 stop all 2>/dev/null || true
-pm2 delete all 2>/dev/null || true
+echo "[1/10] Stopping production PM2 processes..."
+pm2 stop  "ecare-backend"  2>/dev/null || true
+pm2 stop  "ecare-frontend" 2>/dev/null || true
+pm2 delete "ecare-backend"  2>/dev/null || true
+pm2 delete "ecare-frontend" 2>/dev/null || true
 fuser -k 5500/tcp 2>/dev/null || true
 fuser -k 4173/tcp 2>/dev/null || true
-echo "✓ PM2 stopped, ports freed"
+echo "✓ Production PM2 stopped, ports freed"
 
 # ── 2. Pull / clone backend ───────────────────────────────────
 echo ""
