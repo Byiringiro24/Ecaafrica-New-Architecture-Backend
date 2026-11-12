@@ -72,8 +72,12 @@ echo "✓ Backend pulled — $(git log --oneline -1)"
 #   - .env does not exist       → write full defaults
 #   - key already in .env       → leave untouched (server admin value wins)
 #   - key MISSING from .env     → append it
-# This means DATABASE_URL, passwords, and secrets set manually on
-# the server are NEVER overwritten by a redeploy.
+# DATABASE_URL, secrets, and passwords set manually are NEVER overwritten.
+#
+# NOTE: DEV_PASSWORD does NOT belong in this .env.
+#   The bridge dev password is stored in tablets.dev_password (DB).
+#   Super admin sets it via UI → it is read from DB by getTabletClient().
+#   The bridge polls it every 30s and auto-applies it.
 merge_env() {
   local key="$1" value="$2" file="$3"
   if [ ! -f "$file" ]; then
@@ -93,6 +97,9 @@ if [ -f "$ENV_FILE" ]; then
 else
   echo "  ✓ No .env found — creating with defaults"
 fi
+
+# Remove DEV_PASSWORD if it was accidentally added (server never uses it)
+sed -i '/^DEV_PASSWORD=/d' "$ENV_FILE" 2>/dev/null || true
 
 # ── Database ──────────────────────────────────────────────────
 merge_env "DATABASE_URL"               '"postgresql://postgres:2211@localhost:5432/ecareafrica?schema=public"' "$ENV_FILE"
@@ -120,12 +127,12 @@ merge_env "RATE_LIMIT_WINDOW_MS" "900000" "$ENV_FILE"
 merge_env "RATE_LIMIT_MAX"       "100"    "$ENV_FILE"
 
 # ── Storage ───────────────────────────────────────────────────
-merge_env "S3_ENDPOINT"       "https://abcd1234efgh.r2.cloudflarestorage.com" "$ENV_FILE"
-merge_env "S3_REGION"         "auto"                                           "$ENV_FILE"
-merge_env "S3_BUCKET"         "ecareafrica-storage"                            "$ENV_FILE"
-merge_env "S3_ACCESS_KEY_ID"  "RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g" "$ENV_FILE"
+merge_env "S3_ENDPOINT"          "https://abcd1234efgh.r2.cloudflarestorage.com" "$ENV_FILE"
+merge_env "S3_REGION"            "auto"                                           "$ENV_FILE"
+merge_env "S3_BUCKET"            "ecareafrica-storage"                            "$ENV_FILE"
+merge_env "S3_ACCESS_KEY_ID"     "RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g" "$ENV_FILE"
 merge_env "S3_SECRET_ACCESS_KEY" "RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g" "$ENV_FILE"
-merge_env "S3_PUBLIC_URL"     "https://pub.r2.dev" "$ENV_FILE"
+merge_env "S3_PUBLIC_URL"        "https://pub.r2.dev" "$ENV_FILE"
 
 # ── Email ─────────────────────────────────────────────────────
 merge_env "SMTP_HOST" "smtp.gmail.com"                 "$ENV_FILE"
@@ -135,12 +142,12 @@ merge_env "SMTP_PASS" "elkrdmcpmksazazy"               "$ENV_FILE"
 merge_env "SMTP_FROM" "netrackdevelopement@gmail.com" "$ENV_FILE"
 
 # ── Services ──────────────────────────────────────────────────
-merge_env "REDIS_URL"           "redis://localhost:6379"              "$ENV_FILE"
+merge_env "REDIS_URL"           "redis://localhost:6379"               "$ENV_FILE"
 merge_env "SMS_UGANDA_API_URL"  "http://text.emediauganda.com/api.php" "$ENV_FILE"
-merge_env "SMS_UGANDA_USER"     "your_username"                       "$ENV_FILE"
-merge_env "SMS_UGANDA_PASSWORD" "your_password"                       "$ENV_FILE"
-merge_env "SMS_UGANDA_SENDER"   "EducationCare"                       "$ENV_FILE"
-merge_env "APP_BASE_URL"        "https://ecareafrica.net"             "$ENV_FILE"
+merge_env "SMS_UGANDA_USER"     "your_username"                        "$ENV_FILE"
+merge_env "SMS_UGANDA_PASSWORD" "your_password"                        "$ENV_FILE"
+merge_env "SMS_UGANDA_SENDER"   "EducationCare"                        "$ENV_FILE"
+merge_env "APP_BASE_URL"        "https://ecareafrica.net"              "$ENV_FILE"
 
 # ── WireGuard ─────────────────────────────────────────────────
 merge_env "WG_CONF_PATH"     "/etc/wireguard/wg0.conf"          "$ENV_FILE"
@@ -173,14 +180,62 @@ cd "$BACKEND_DIR"
 npm install --production=false
 echo "✓ Dependencies installed"
 
-# ── 5. Prisma ─────────────────────────────────────────────────
+# ── 5. Prisma + safety patches ────────────────────────────────
 echo ""
 echo "[5/10] Prisma generate + migrate deploy..."
 npx prisma generate --schema src/models/schema.prisma
 npx prisma migrate deploy --schema src/models/schema.prisma
-# NOTE: seed is intentionally skipped — seed inserts demo data and would
-# corrupt a live school database. To seed a fresh install run: npm run seed
-echo "✓ Prisma ready (all migrations applied)"
+# NOTE: seed skipped — would corrupt live school data.
+# To seed a fresh install: npm run seed
+
+# Safety: apply columns that may be missing if DB was cloned from an older dump
+# (migration already marked applied but column was never created)
+echo "  Applying safety column patches..."
+DB_NAME=$(grep '^DATABASE_URL=' "$ENV_FILE" | sed "s|.*5432/\([^?\"]*\).*|\1|")
+DB_PASS=$(grep '^DATABASE_URL=' "$ENV_FILE" | sed 's/.*:\([^:@]*\)@.*/\1/')
+PGPASSWORD="$DB_PASS" psql -U postgres -h 127.0.0.1 -d "$DB_NAME" -q << 'SQLEOF'
+CREATE TABLE IF NOT EXISTS "attendance_logs" (
+  "id" BIGSERIAL PRIMARY KEY,
+  "school_id" BIGINT,
+  "log_id" TEXT,
+  "user_id" TEXT,
+  "student_id" TEXT,
+  "student_device_id" TEXT,
+  "student_name" TEXT,
+  "class_name" TEXT,
+  "section" TEXT,
+  "device_id" TEXT,
+  "authentication_method" TEXT,
+  "direction" TEXT,
+  "timestamp" TIMESTAMPTZ,
+  "status" TEXT,
+  "attendance_period" TEXT,
+  "raw_data" JSONB,
+  "sync_state" VARCHAR(20) NOT NULL DEFAULT 'synced',
+  "is_flagged" BOOLEAN NOT NULL DEFAULT FALSE,
+  "flag_reason" VARCHAR(255),
+  "synced_at" TIMESTAMPTZ,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "attendance_logs_log_id_device_id_key"
+  ON "attendance_logs" ("log_id", "device_id");
+CREATE INDEX IF NOT EXISTS "attendance_logs_school_id_idx"
+  ON "attendance_logs" ("school_id");
+CREATE INDEX IF NOT EXISTS "attendance_logs_timestamp_idx"
+  ON "attendance_logs" ("timestamp");
+ALTER TABLE "boarding_attendance_records"
+  ADD COLUMN IF NOT EXISTS "dormitory_id" BIGINT;
+CREATE INDEX IF NOT EXISTS "boarding_attendance_records_dormitory_id_idx"
+  ON "boarding_attendance_records" ("dormitory_id");
+SQLEOF
+
+# Seed tablet dev_password from bridge default if not already set
+# (super admin can change it via UI; this just ensures fresh installs work)
+PGPASSWORD="$DB_PASS" psql -U postgres -h 127.0.0.1 -d "$DB_NAME" -q -c \
+  "UPDATE tablets SET dev_password = 'admin1234', dev_password_set_at = NOW()
+   WHERE dev_password IS NULL OR dev_password = '';" 2>/dev/null || true
+
+echo "✓ Prisma + safety patches done"
 
 # ── 6. Build ──────────────────────────────────────────────────
 echo ""
@@ -227,11 +282,16 @@ echo ""
 echo "[9/10] Updating nginx production config..."
 NGINX_CONF="$BACKEND_DIR/deployment/linux/ecareafrica-nginx.conf"
 if [ -f "$NGINX_CONF" ]; then
-  # Strip BOM if present (causes 'unknown directive' nginx error)
+  # Strip BOM if present (causes 'unknown directive "#"' nginx error)
   sed -i '1s/^\xEF\xBB\xBF//' "$NGINX_CONF"
   cp "$NGINX_CONF" /etc/nginx/sites-available/ecareafrica
   ln -sf /etc/nginx/sites-available/ecareafrica /etc/nginx/sites-enabled/ecareafrica
   rm -f /etc/nginx/sites-enabled/default
+  # Add proxy read timeout to prevent 502 on slow device status requests
+  if ! grep -q "proxy_read_timeout" /etc/nginx/sites-available/ecareafrica; then
+    sed -i 's|proxy_pass http://127.0.0.1:5500;|proxy_pass http://127.0.0.1:5500;\n        proxy_read_timeout 120s;\n        proxy_connect_timeout 10s;|' \
+      /etc/nginx/sites-available/ecareafrica 2>/dev/null || true
+  fi
   nginx -t && nginx -s reload
   echo "✓ Nginx updated and reloaded"
 else
