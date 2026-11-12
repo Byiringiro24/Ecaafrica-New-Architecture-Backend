@@ -236,6 +236,8 @@ export const pingDevice = async (req: Request, res: Response) => {
     }));
   }
 };
+
+export const listDevices = async (req: Request, res: Response) => {
   const pagination = parsePagination(req.query as Record<string, string>);
   const schoolId = req.query.school_id ? toBigInt(req.query.school_id as string) : undefined;
 
