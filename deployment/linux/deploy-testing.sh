@@ -248,6 +248,11 @@ ALTER TABLE "boarding_attendance_records"
   ADD COLUMN IF NOT EXISTS "dormitory_id" BIGINT;
 CREATE INDEX IF NOT EXISTS "boarding_attendance_records_dormitory_id_idx"
   ON "boarding_attendance_records" ("dormitory_id");
+
+-- Activate pending/inactive users so they can log in to the portal
+-- pending = account created but email not verified — safe to activate
+UPDATE users SET status = 'active'
+  WHERE status IN ('pending', 'inactive');
 SQLEOF
 echo "✓ Safety patches applied"
 

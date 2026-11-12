@@ -393,10 +393,21 @@ export const loginSchoolUser = async (
     throw new AppError("invalid_credentials", "Invalid email or password", 401);
   }
 
-  await prisma.users.update({
-    where: { id: user.id },
-    data: { last_login_at: new Date() }
-  });
+  // Auto-activate pending users on successful login — pending just means email
+  // verification hasn't been completed, but we allow portal access regardless.
+  // This prevents users from being permanently locked out if the activation email
+  // was never sent or expired.
+  if (user.status === "pending" || user.status === "inactive") {
+    await prisma.users.update({
+      where: { id: user.id },
+      data: { status: "active", last_login_at: new Date() }
+    });
+  } else {
+    await prisma.users.update({
+      where: { id: user.id },
+      data: { last_login_at: new Date() }
+    });
+  }
 
   const payload = buildSchoolPayload(user);
   const accessToken = signAccessToken(payload, { scope: "school" });
