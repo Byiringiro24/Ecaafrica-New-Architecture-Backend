@@ -136,31 +136,35 @@ const normalizeBaseUrl = (value: string | null | undefined) => {
 };
 
 export const resolveDeviceApiUrl = (device: devices & { tablet?: { url: string } | null }) => {
+  // Priority 1: tablet.url — the Windows laptop bridge HTTP URL (set during registration)
+  // This is the ONLY correct URL for push/pull operations on the bridge.
   const tabletUrl = normalizeBaseUrl(device.tablet?.url);
   if (tabletUrl) return tabletUrl;
 
+  // Priority 2: device.api_url — manually configured bridge URL
   const savedApiUrl = normalizeBaseUrl(device.api_url);
   if (savedApiUrl) return savedApiUrl;
 
-  if (device.tablet_ip && device.tablet_port) {
-    return `http://${device.tablet_ip}:${device.tablet_port}`;
-  }
+  // NOTE: We do NOT fall back to tablet_ip:tablet_port here.
+  // tablet_ip:tablet_port is the FK623 biometric device's IP on the school LAN,
+  // not the Windows laptop bridge. Using it would send HTTP requests directly to
+  // the FK623 TCP port (5005), which is not an HTTP server and will reject them.
+  // The correct bridge URL is always tablet.url (WireGuard VPN address).
   return null;
 };
 
 export const resolveTabletBridgeUrl = (device: devices & { tablet?: { url: string } | null }) => {
+  // Priority 1: tablet.url — the Windows laptop bridge HTTP URL via WireGuard VPN
   const tabletUrl = normalizeBaseUrl(device.tablet?.url);
   if (tabletUrl) return tabletUrl;
 
+  // Priority 2: device.api_url — manually configured bridge URL
   const savedApiUrl = normalizeBaseUrl(device.api_url);
   if (savedApiUrl) return savedApiUrl;
 
-  // Accept any port as the bridge API port (not just 5000).
-  // The bridge server.js defaults to PORT=5000 but this can be configured.
-  if (device.tablet_ip && device.tablet_port) {
-    return `http://${device.tablet_ip}:${device.tablet_port}`;
-  }
-
+  // NOTE: tablet_ip:tablet_port is NOT used here.
+  // It refers to the FK623's LAN IP which is not reachable from the server.
+  // Only the bridge URL (via WireGuard) is reachable from the server.
   return null;
 };
 
@@ -601,7 +605,7 @@ export const pushStudentsToDevice = async (
       id: toBigInt(id),
       school_id: toBigInt(schoolId)
     },
-    include: { tablet: { select: { url: true } } }
+    include: { tablet: { select: { url: true, dev_password: true } } }
   });
 
   if (!device) {
@@ -612,7 +616,11 @@ export const pushStudentsToDevice = async (
   if (!apiUrl) {
     throw new AppError(
       "bad_request",
-      "Device has no API URL or tablet connection configured. Set the tablet IP and port in device settings.",
+      device.tablet_id
+        ? "Device is linked to a tablet but the tablet has no WireGuard VPN URL configured. " +
+          "Go to Super Admin → Hardware → Tablets, edit the tablet and ensure IP and port are set " +
+          "so the bridge URL can be resolved."
+        : "Device is not linked to a tablet. Link it in Device Settings → Tablet Assignment first.",
       400
     );
   }
@@ -720,7 +728,10 @@ export const pushStudentsToDevice = async (
     }
   });
 
-  const tabletClient = new TabletClientService(apiUrl);
+  // Pass tablet dev_password so X-Dev-Password header is sent to the bridge.
+  // Required for push-students — bridge rejects with 401 without it.
+  const devPassword = (device.tablet as any)?.dev_password || null;
+  const tabletClient = new TabletClientService(apiUrl, devPassword);
   const pushed: Array<{ id: string; user_id: string; name: string }> = [];
   const failed: Array<{ id: string; user_id: string; name: string; error: string }> = [];
 
@@ -813,7 +824,7 @@ export const removeStudentsFromDevice = async (
 
   const device = await prisma.devices.findFirst({
     where: { id: toBigInt(id), school_id: toBigInt(schoolId) },
-    include: { tablet: { select: { url: true } } }
+    include: { tablet: { select: { url: true, dev_password: true } } }
   });
   if (!device) throw new AppError("not_found", "Device not found", 404);
 
@@ -861,7 +872,7 @@ export const removeStudentsFromDevice = async (
     }
   });
 
-  const tabletClient = new TabletClientService(apiUrl);
+  const tabletClient = new TabletClientService(apiUrl, (device.tablet as any)?.dev_password || null);
   const removed: Array<{ id: string; user_id: string; name: string }> = [];
   const failed: Array<{ id: string; user_id: string; name: string; error: string }> = [];
 
