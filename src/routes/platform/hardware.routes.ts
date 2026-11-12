@@ -85,6 +85,11 @@ hardwareRoutes.post("/devices", validate(platformDeviceSchema), asyncWrapper(har
 hardwareRoutes.patch("/devices/:id", validate(platformDeviceUpdateSchema), asyncWrapper(hardwareController.updateDevice));
 hardwareRoutes.delete("/devices/:id", validate({ params: idParamSchema }), asyncWrapper(hardwareController.deleteDevice));
 
+// Ping a specific FK623 device via its bridge — returns real FK623 reachability
+// Flow: server → bridge (WireGuard) → FK623 (school LAN)
+// Each device is pinged independently even if multiple share the same tablet.
+hardwareRoutes.get("/devices/:id/ping", validate({ params: idParamSchema }), asyncWrapper(hardwareController.pingDevice));
+
 // ── WireGuard VPN Management (super admin — no SSH required) ──────────────────
 import * as vpnController from "../../controllers/platform/wireguard.controller";
 

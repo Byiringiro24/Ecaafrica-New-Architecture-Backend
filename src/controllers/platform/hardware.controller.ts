@@ -124,7 +124,118 @@ export const pingTablet = async (req: Request, res: Response) => {
   res.json(successResponse(health));
 };
 
-export const listDevices = async (req: Request, res: Response) => {
+/**
+ * GET /platform/hardware/devices/:deviceId/ping
+ * Ping a specific FK623 biometric device via its linked tablet bridge.
+ * Flow: server → tablet bridge (WireGuard) → FK623 device (school LAN)
+ * Returns real FK623 reachability, not just bridge reachability.
+ * Each device is pinged independently even if multiple share the same tablet.
+ */
+export const pingDevice = async (req: Request, res: Response) => {
+  const deviceId = req.params.id ?? req.params.deviceId;
+
+  const device = await prisma.devices.findFirst({
+    where: { id: toBigInt(deviceId) },
+    include: { tablet: { select: { id: true, url: true, ip: true, port: true, dev_password: true } } },
+  });
+
+  if (!device) throw new AppError("not_found", "Device not found", 404);
+
+  const bridgeUrl = device.tablet?.url
+    ? device.tablet.url.replace(/\/+$/, "")
+    : device.tablet?.ip && device.tablet?.port
+      ? `http://${device.tablet.ip}:${device.tablet.port}`
+      : null;
+
+  if (!bridgeUrl) {
+    return res.json(successResponse({
+      deviceId: deviceId.toString(),
+      deviceName: device.name,
+      connected: false,
+      fk623Reachable: false,
+      bridgeReachable: false,
+      message: "Device has no linked tablet — cannot ping",
+    }));
+  }
+
+  const devPassword = (device.tablet as any)?.dev_password || null;
+  const bridgeDeviceId = device.device_uid;
+
+  if (!bridgeDeviceId) {
+    // No bridge device UUID — fall back to pinging the tablet bridge health only
+    try {
+      const { TabletClientService } = await import("../../services/tablet-client.service");
+      const client = new TabletClientService(bridgeUrl, devPassword);
+      const start = Date.now();
+      const health = await client.health();
+      return res.json(successResponse({
+        deviceId: deviceId.toString(),
+        deviceName: device.name,
+        connected: true,
+        fk623Reachable: null, // unknown — no bridge device UUID to route to
+        bridgeReachable: true,
+        responseTimeMs: Date.now() - start,
+        message: "Tablet bridge reachable but device has no Bridge UUID set — set it in the edit form to ping FK623 directly",
+        health,
+      }));
+    } catch (err) {
+      return res.json(successResponse({
+        deviceId: deviceId.toString(),
+        deviceName: device.name,
+        connected: false,
+        fk623Reachable: false,
+        bridgeReachable: false,
+        message: `Tablet bridge not reachable: ${(err as Error).message}`,
+      }));
+    }
+  }
+
+  // Bridge device UUID is set — ping the specific FK623 via /api/devices-config/:id/ping
+  try {
+    const start = Date.now();
+    const axios = (await import("axios")).default;
+    const url = `${bridgeUrl}/api/devices-config/${encodeURIComponent(bridgeDeviceId)}/ping`;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (devPassword) headers["X-Dev-Password"] = devPassword;
+
+    const response = await axios.get(url, { timeout: 10000, headers, validateStatus: () => true });
+    const data = response.data || {};
+    const fk623Reachable = data.connected === true || data.fk623Reachable === true;
+
+    // Update DB with real status
+    await prisma.devices.update({
+      where: { id: device.id },
+      data: {
+        is_connected: fk623Reachable,
+        last_connection_at: fk623Reachable ? new Date() : undefined,
+        last_status_message: fk623Reachable
+          ? "FK623 connected — WireGuard active — ready to scan"
+          : (data.message || "FK623 not reachable on school LAN"),
+        ...(fk623Reachable ? { last_seen_at: new Date() } : {}),
+      },
+    });
+
+    return res.json(successResponse({
+      deviceId: deviceId.toString(),
+      deviceName: device.name,
+      connected: fk623Reachable,
+      fk623Reachable,
+      bridgeReachable: response.status < 500,
+      responseTimeMs: Date.now() - start,
+      message: data.message || (fk623Reachable ? "FK623 is responding" : "FK623 not reachable"),
+      deviceInfo: data.deviceInfo || null,
+    }));
+  } catch (err) {
+    return res.json(successResponse({
+      deviceId: deviceId.toString(),
+      deviceName: device.name,
+      connected: false,
+      fk623Reachable: false,
+      bridgeReachable: false,
+      message: `Bridge not reachable via WireGuard: ${(err as Error).message}`,
+    }));
+  }
+};
   const pagination = parsePagination(req.query as Record<string, string>);
   const schoolId = req.query.school_id ? toBigInt(req.query.school_id as string) : undefined;
 
