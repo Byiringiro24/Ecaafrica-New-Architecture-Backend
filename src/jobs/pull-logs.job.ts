@@ -77,7 +77,7 @@ async function pullForTablet(
     try {
       // Get ALL devices registered on this tablet
       const devices = await prisma.devices.findMany({
-        where: { tablet_id: tabletId, school_id: schoolId, is_active: true, deleted_at: null },
+        where: { tablet_id: tabletId, school_id: schoolId, is_active: true },
         select: { id: true, device_uid: true, name: true },
         orderBy: { updated_at: 'desc' },
       });
