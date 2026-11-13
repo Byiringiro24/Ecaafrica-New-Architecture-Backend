@@ -838,6 +838,9 @@ export class TabletService {
       (Date.now() - new Date(lastConnected).getTime()) < 60_000 &&
       deviceForConnect?.is_connected === true;
 
+    // Declare bridgeDeviceId here so it's available for both connect and pull
+    const bridgeDeviceId = deviceForConnect?.device_uid ?? null;
+
     if (!isRecentlyConnected) {
       try {
         // Use per-device connect when device_uid is set — avoids disrupting other FK623 devices
@@ -867,7 +870,7 @@ export class TabletService {
     // Route through /api/devices-config/:deviceUid/pull-logs when device_uid is
     // known — this ensures each FK623 on a multi-device laptop is polled separately.
     // Fall back to /api/device/pull-logs (single-device path) when device_uid is not set.
-    const bridgeDeviceId = deviceForConnect?.device_uid ?? null;
+    // (bridgeDeviceId already declared above)
     let result: any;
     try {
       result = bridgeDeviceId
