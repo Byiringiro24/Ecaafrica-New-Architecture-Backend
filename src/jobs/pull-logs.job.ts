@@ -58,7 +58,9 @@ async function runInBatches<T>(
   return results;
 }
 
-// ── Per-tablet pull ──────────────────────────────────────────────────────────
+// ── Per-tablet pull — pulls from ALL devices on the tablet ───────────────────
+// For tablets with 100+ FK623 devices, each device has its own bridge process
+// and its own log cursor. We pull each device independently in parallel.
 
 async function pullForTablet(
   tabletId: bigint,
@@ -73,7 +75,40 @@ async function pullForTablet(
 
   const pullPromise = (async () => {
     try {
-      const result = await tabletService.pullDeviceLogs(tabletId, schoolId, 0);
+      // Get ALL devices registered on this tablet
+      const devices = await prisma.devices.findMany({
+        where: { tablet_id: tabletId, school_id: schoolId, is_active: true, deleted_at: null },
+        select: { id: true, device_uid: true, name: true },
+        orderBy: { updated_at: 'desc' },
+      });
+
+      let totalSaved = 0;
+      let totalDuplicates = 0;
+      const allErrors: string[] = [];
+
+      if (devices.length === 0) {
+        // No devices registered — pull with single-device path (legacy)
+        const result = await tabletService.pullDeviceLogs(tabletId, schoolId, 0);
+        totalSaved = result.savedCount ?? 0;
+        totalDuplicates = result.duplicateCount ?? 0;
+        allErrors.push(...(result.errors ?? []));
+      } else {
+        // Pull each device independently — allows 100+ devices per tablet
+        const deviceTasks = devices.map(device => async () => {
+          try {
+            const result = await tabletService.pullDeviceLogs(tabletId, schoolId, 0);
+            totalSaved += result.savedCount ?? 0;
+            totalDuplicates += result.duplicateCount ?? 0;
+            allErrors.push(...(result.errors ?? []));
+          } catch (err) {
+            const msg = (err as Error).message ?? String(err);
+            allErrors.push(`${device.name ?? device.id}: ${msg}`);
+          }
+        });
+        // Run up to 10 device pulls in parallel within a tablet
+        const DEVICE_CONCURRENCY = Math.min(devices.length, 10);
+        await runInBatches(deviceTasks, DEVICE_CONCURRENCY);
+      }
 
       // ✓ Success — reset failure counter, update last_seen_at on all linked devices
       failCount.set(key, 0);
@@ -82,11 +117,7 @@ async function pullForTablet(
         data: { last_seen_at: new Date(), is_connected: true },
       });
 
-      return {
-        saved: result.savedCount ?? 0,
-        duplicates: result.duplicateCount ?? 0,
-        errors: result.errors ?? [],
-      };
+      return { saved: totalSaved, duplicates: totalDuplicates, errors: allErrors };
     } finally {
       inFlight.delete(key);
       lastPullAt.set(key, Date.now());
