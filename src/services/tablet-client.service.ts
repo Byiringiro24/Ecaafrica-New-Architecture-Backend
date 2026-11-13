@@ -227,10 +227,19 @@ export class TabletClientService {
   }
 
   /**
-   * Connect with explicit IP/port/license — only use from the Super Admin
-   * "Link Device" form when first registering FK623 credentials on the bridge.
-   * For auto-pull, use connectDevice() which calls connect-saved.
+   * Trigger reconnect for a SPECIFIC FK623 device via its bridge device-config ID.
+   * The bridge's auto-connect loop already handles this, but we can nudge it
+   * by calling the connect endpoint explicitly.
    */
+  async connectDeviceById(deviceConfigId: string): Promise<FK623ConnectResponse> {
+    try {
+      const response = await this.client.post(`/api/devices-config/${deviceConfigId}/connect`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error connecting device ${deviceConfigId}:`, (error as Error).message);
+      throw this.handleError(error as AxiosError);
+    }
+  }
   async connectDeviceExplicit(config: FK623ConnectConfig): Promise<FK623ConnectResponse> {
     try {
       const response = await this.client.post('/api/device/connect', {

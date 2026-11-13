@@ -840,7 +840,10 @@ export class TabletService {
 
     if (!isRecentlyConnected) {
       try {
-        const connectResult: any = await client.connectDevice();
+        // Use per-device connect when device_uid is set — avoids disrupting other FK623 devices
+        const connectResult: any = bridgeDeviceId
+          ? await client.connectDeviceById(bridgeDeviceId).catch(() => client.connectDevice())
+          : await client.connectDevice();
         if (deviceForConnect) {
           await prisma.devices.update({
             where: { id: deviceForConnect.id },
@@ -884,7 +887,14 @@ export class TabletService {
       // Bridge says device not connected — connection was lost. Re-connect and retry once.
       if (/not connected|device not connected/i.test(msg)) {
         try {
-          await client.connectDevice();
+          // Use per-device reconnect if device_uid is set, otherwise use global connect-saved
+          if (bridgeDeviceId) {
+            // For per-device: send STATUS to trigger reconnect via the bridge's own auto-connect
+            // The bridge auto-reconnects internally — we just wait and retry
+            await new Promise(r => setTimeout(r, 2000));
+          } else {
+            await client.connectDevice();
+          }
           if (deviceForConnect) {
             await prisma.devices.update({
               where: { id: deviceForConnect.id },

@@ -373,8 +373,14 @@ const formatDeviceWithStatus = async (
     status,
     is_online: isOnline,
     is_connected: isConnected,
+    // connection_tier lets the frontend show 3-tier status without a live ping:
+    //   "full"   = FK623 confirmed connected (is_connected=true from pull-logs job)
+    //   "bridge" = tablet bridge reachable but FK623 not confirmed (cached only)
+    //   "offline"= not reachable
+    connection_tier: isConnected ? "full" : (tabletOnline || recentHeartbeat ? "bridge" : "offline"),
     last_seen_at: lastSeenAt?.toISOString() ?? null,
     last_sync_at: record.last_sync_at?.toISOString() ?? null,
+    last_status_message: record.last_status_message ?? null,
     tablet_port: record.tablet_port?.toString() ?? null,
     tablet: record.tablet ? {
       id: record.tablet.id?.toString() ?? null,
