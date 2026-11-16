@@ -154,18 +154,24 @@ deviceRoutes.get(
 deviceRoutes.post(
   "/",
   validate(createDeviceSchema),
-  requireSystemAdmin, // Only system admin can register devices
+  requireSystemAdmin,
   asyncWrapper(deviceController.registerDevice)
 );
 
-// Device logs feature endpoint - list all device statuses
+// Real-time device status — pings every bridge directly, never reads from DB.
+// This is the ONLY endpoint the frontend should use to show device online/offline.
+// Response time is ~3–8s (bridge timeout). Frontend shows a spinner during this.
+deviceRoutes.get(
+  "/live-status",
+  asyncWrapper(deviceController.listLiveDeviceStatuses)
+);
+
+// Legacy cached status endpoint (kept for background jobs / health panel)
 deviceRoutes.get(
   "/status",
   asyncWrapper(deviceController.listDeviceStatuses)
 );
 
-// Static routes must be registered before /:id, otherwise "locations" is
-// treated as a device id and rejected by deviceIdParamSchema.
 deviceRoutes.get(
   "/locations",
   asyncWrapper(deviceAssignmentController.listDevicesWithLocation)

@@ -335,9 +335,12 @@ const formatDeviceWithStatus = async (
   const recentHeartbeat = lastSeenAt ? Date.now() - lastSeenAt.getTime() < 120_000 : false;
 
   // Trust the DB is_connected field written by the pull-logs job.
-  // The job now explicitly sets is_connected=false when a tablet is unreachable,
-  // so this field is authoritative — do NOT recalculate it from last_seen_at.
-  const dbIsConnected = record.is_connected === true;
+  // HARD EXPIRY: if last_seen_at is older than 3 minutes, force offline regardless
+  // of is_connected. This prevents the "device shows online hours after disconnect"
+  // problem caused by is_connected never being reset when the pull-logs job is idle.
+  const HARD_EXPIRY_MS = 3 * 60 * 1000; // 3 minutes
+  const isExpired = lastSeenAt ? Date.now() - lastSeenAt.getTime() > HARD_EXPIRY_MS : true;
+  const dbIsConnected = record.is_connected === true && !isExpired;
 
   // Also trust tablet.status='online' set by pull-logs on success.
   // But only if it was recently confirmed — tablet.status can be stale on its
@@ -398,6 +401,192 @@ const resolveOrderBy = (sort?: string, order?: "asc" | "desc") => {
     return { [sort]: order ?? "desc" } as Prisma.devicesOrderByWithRelationInput;
   }
   return { created_at: "desc" } as Prisma.devicesOrderByWithRelationInput;
+};
+
+/**
+ * getLiveDeviceStatuses
+ *
+ * Returns the REAL-TIME connectivity status for every device belonging to a school.
+ * This function NEVER reads is_connected or last_seen_at from the database.
+ *
+ * How it works:
+ *   1. Load all active devices for the school with their tablet bridge URLs.
+ *   2. Group devices by bridge URL (one bridge serves multiple FK623 units).
+ *   3. For each unique bridge, call GET /api/devices-config/status once.
+ *      This endpoint asks the bridge's DeviceBridgeManager for each device's
+ *      live connected state — which the bridge knows from its _autoConnect()
+ *      loop and STATUS health checks running every 15s.
+ *   4. For devices on a bridge that is completely unreachable (WireGuard down),
+ *      mark all its devices as offline tier.
+ *   5. Return the result. The DB is NOT updated here — this is read-only.
+ *
+ * Result tier values:
+ *   "full"   = bridge reachable + this FK623 device is connected on the LAN
+ *   "bridge" = bridge reachable + this FK623 not physically connected
+ *   "offline" = bridge not reachable (WireGuard down or tablet off)
+ */
+export const getLiveDeviceStatuses = async (
+  schoolId: string | number | bigint
+): Promise<Array<{
+  id: string;
+  name: string;
+  device_uid: string;
+  mode: string;
+  location: string | null;
+  location_scope: string | null;
+  tablet_id: string | null;
+  connected: boolean;
+  connection_tier: "full" | "bridge" | "offline";
+  error: string | null;
+  lastAttempt: string | null;
+  bridge_reachable: boolean;
+}>> => {
+  const devices = await prisma.devices.findMany({
+    where: { school_id: toBigInt(schoolId), is_active: true },
+    select: {
+      id: true,
+      name: true,
+      device_uid: true,
+      mode: true,
+      location: true,
+      location_scope: true,
+      tablet_id: true,
+      tablet: { select: { url: true, ip: true, port: true } },
+    },
+  });
+
+  if (devices.length === 0) return [];
+
+  // Group devices by bridge base URL
+  const bridgeMap = new Map<string, typeof devices>();
+  const noBridgeDevices: typeof devices = [];
+
+  for (const device of devices) {
+    const url = normalizeBaseUrl(device.tablet?.url ?? null)
+      ?? (device.tablet?.ip ? `http://${device.tablet.ip}:${device.tablet.port ?? 5000}` : null);
+    if (!url) {
+      noBridgeDevices.push(device);
+    } else {
+      const list = bridgeMap.get(url) ?? [];
+      list.push(device);
+      bridgeMap.set(url, list);
+    }
+  }
+
+  // Ping each unique bridge in parallel
+  type BridgeDeviceStatus = { id: string; connected: boolean; lastError?: string | null; lastAttempt?: string | null };
+  const bridgeResults = new Map<string, { reachable: boolean; devices: BridgeDeviceStatus[] }>();
+
+  await Promise.all(
+    Array.from(bridgeMap.entries()).map(async ([bridgeUrl]) => {
+      try {
+        const response = await axios.get(`${bridgeUrl}/api/devices-config/status`, {
+          timeout: 8000,
+          validateStatus: () => true,
+        });
+        if (response.status === 200 && Array.isArray(response.data?.devices)) {
+          bridgeResults.set(bridgeUrl, {
+            reachable: true,
+            devices: response.data.devices.map((d: any) => ({
+              id: d.id,
+              connected: Boolean(d.connected),
+              lastError: d.lastError ?? null,
+              lastAttempt: d.lastAttempt ?? null,
+            })),
+          });
+        } else {
+          // Bridge responded but unexpected data — treat as reachable but no devices
+          bridgeResults.set(bridgeUrl, { reachable: true, devices: [] });
+        }
+      } catch {
+        // Bridge unreachable — WireGuard down or tablet off
+        bridgeResults.set(bridgeUrl, { reachable: false, devices: [] });
+      }
+    })
+  );
+
+  // Build result — one entry per device
+  const result: ReturnType<typeof getLiveDeviceStatuses> extends Promise<infer T> ? T : never = [];
+
+  for (const device of devices) {
+    const bridgeUrl = normalizeBaseUrl(device.tablet?.url ?? null)
+      ?? (device.tablet?.ip ? `http://${device.tablet.ip}:${device.tablet.port ?? 5000}` : null);
+
+    if (!bridgeUrl) {
+      result.push({
+        id: device.id.toString(),
+        name: device.name,
+        device_uid: device.device_uid,
+        mode: device.mode,
+        location: device.location ?? null,
+        location_scope: device.location_scope ?? null,
+        tablet_id: device.tablet_id?.toString() ?? null,
+        connected: false,
+        connection_tier: "offline",
+        error: "No tablet bridge configured",
+        lastAttempt: null,
+        bridge_reachable: false,
+      });
+      continue;
+    }
+
+    const bridgeResult = bridgeResults.get(bridgeUrl);
+    if (!bridgeResult?.reachable) {
+      result.push({
+        id: device.id.toString(),
+        name: device.name,
+        device_uid: device.device_uid,
+        mode: device.mode,
+        location: device.location ?? null,
+        location_scope: device.location_scope ?? null,
+        tablet_id: device.tablet_id?.toString() ?? null,
+        connected: false,
+        connection_tier: "offline",
+        error: "Tablet bridge unreachable — check WireGuard VPN",
+        lastAttempt: null,
+        bridge_reachable: false,
+      });
+      continue;
+    }
+
+    // Bridge is reachable — look up this specific device in its status list
+    const devStatus = bridgeResult.devices.find(d => d.id === device.device_uid);
+    const connected = devStatus?.connected ?? false;
+    result.push({
+      id: device.id.toString(),
+      name: device.name,
+      device_uid: device.device_uid,
+      mode: device.mode,
+      location: device.location ?? null,
+      location_scope: device.location_scope ?? null,
+      tablet_id: device.tablet_id?.toString() ?? null,
+      connected,
+      connection_tier: connected ? "full" : "bridge",
+      error: connected ? null : (devStatus?.lastError ?? "FK623 device not connected on local network"),
+      lastAttempt: devStatus?.lastAttempt ?? null,
+      bridge_reachable: true,
+    });
+  }
+
+  // Fire-and-forget: persist the live results to DB so the pull-logs job and
+  // stale-device cleanup have accurate starting values. Never block the response.
+  void (async () => {
+    for (const r of result) {
+      prisma.devices.update({
+        where: { id: BigInt(r.id) },
+        data: {
+          is_connected: r.connected,
+          connection_tier: r.connection_tier,
+          last_status_message: r.error
+            ?? (r.connection_tier === "full" ? "FK623 connected — ready to scan" : undefined),
+          ...(r.connected ? { last_seen_at: new Date(), last_connection_at: new Date(), connection_error: null } : {}),
+          ...(!r.bridge_reachable ? { connection_error: r.error ?? "Bridge unreachable" } : {}),
+        },
+      }).catch(() => null);
+    }
+  })();
+
+  return result;
 };
 
 export const registerDevice = async (
@@ -1038,15 +1227,20 @@ export const getDeviceStatus = async (schoolId: string | number | bigint, id: st
   const updated = await prisma.devices.update({
     where: { id: device.id },
     data: {
-      ...(isOnline ? { last_seen_at: new Date() } : {}),
-      ...(fk623Connected ? { is_connected: true, last_connection_at: new Date() } : {}),
+      // Always persist the live connection_tier so DB is authoritative
+      connection_tier: connectionTier,
+      // Update timestamps only when we actually reached the device
+      ...(isOnline    ? { last_seen_at: new Date() } : {}),
+      ...(fk623Connected ? { is_connected: true,  last_connection_at: new Date(), connection_error: null } : {}),
+      // When bridge is unreachable, explicitly mark offline — never leave stale true
+      ...(!isOnline   ? { is_connected: false } : {}),
       last_status_message: !bridgeUrl
         ? "Device has no linked tablet bridge configured"
         : connectionTier === "full"
           ? "FK623 connected — WireGuard active — ready to scan"
           : connectionTier === "bridge"
             ? "Tablet bridge reachable — FK623 device not physically connected"
-            : "Tablet bridge offline — check WireGuard VPN and tablet power"
+            : "Tablet bridge offline — check WireGuard VPN and tablet power",
     }
   });
 

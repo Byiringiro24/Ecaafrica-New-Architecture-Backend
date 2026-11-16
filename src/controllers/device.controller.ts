@@ -95,6 +95,18 @@ export const listDeviceStatuses = async (req: Request, res: Response) => {
   res.json(successResponse(statuses));
 };
 
+/**
+ * GET /devices/live-status
+ * Returns real-time connectivity status for every device.
+ * Pings the bridge directly — NEVER reads from the database.
+ * This is the single source of truth for device online/offline in the UI.
+ */
+export const listLiveDeviceStatuses = async (req: Request, res: Response) => {
+  const schoolId = resolveSchoolId(req);
+  const statuses = await deviceService.getLiveDeviceStatuses(schoolId);
+  res.json(successResponse(statuses));
+};
+
 export const getDeviceAttendanceConfig = async (req: Request, res: Response) => {
   const schoolId = resolveSchoolId(req);
   const record = await deviceService.getDeviceAttendanceConfig(schoolId, req.params.id);
