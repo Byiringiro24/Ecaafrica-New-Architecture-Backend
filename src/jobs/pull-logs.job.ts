@@ -86,6 +86,12 @@ async function pullForTablet(
       let totalDuplicates = 0;
       const allErrors: string[] = [];
 
+      // Track per-device success/failure independently.
+      // A device is only marked connected/online if ITS OWN pull succeeded.
+      // One device failing must never set another device's status.
+      const deviceSucceeded = new Set<bigint>();
+      const deviceFailed    = new Map<bigint, string>(); // id → error message
+
       if (devices.length === 0) {
         // No devices registered — pull with single-device path (legacy)
         const result = await tabletService.pullDeviceLogs(tabletId, schoolId, 0);
@@ -94,15 +100,20 @@ async function pullForTablet(
         allErrors.push(...(result.errors ?? []));
       } else {
         // Pull each device independently — allows 100+ devices per tablet
+        // CRITICAL: pass device.device_uid so pullDeviceLogs routes to the correct FK623
         const deviceTasks = devices.map(device => async () => {
           try {
-            const result = await tabletService.pullDeviceLogs(tabletId, schoolId, 0);
+            const result = await tabletService.pullDeviceLogsByUid(
+              tabletId, schoolId, 0, device.device_uid
+            );
             totalSaved += result.savedCount ?? 0;
             totalDuplicates += result.duplicateCount ?? 0;
             allErrors.push(...(result.errors ?? []));
+            deviceSucceeded.add(device.id);
           } catch (err) {
             const msg = (err as Error).message ?? String(err);
-            allErrors.push(`${device.name ?? device.id}: ${msg}`);
+            allErrors.push(`${device.name ?? String(device.id)}: ${msg}`);
+            deviceFailed.set(device.id, msg);
           }
         });
         // Run up to 10 device pulls in parallel within a tablet
@@ -110,12 +121,57 @@ async function pullForTablet(
         await runInBatches(deviceTasks, DEVICE_CONCURRENCY);
       }
 
-      // ✓ Success — reset failure counter, update last_seen_at on all linked devices
+      // ── Per-device status updates ───────────────────────────────────────────
+      // RULE: only mark a device connected if ITS pull succeeded.
+      // Never update a device that didn't even attempt a pull.
+      const now = new Date();
       failCount.set(key, 0);
-      await prisma.devices.updateMany({
-        where: { tablet_id: tabletId, school_id: schoolId },
-        data: { last_seen_at: new Date(), is_connected: true },
-      });
+
+      const statusUpdates: Promise<void>[] = [];
+
+      for (const device of devices) {
+        if (deviceSucceeded.has(device.id)) {
+          statusUpdates.push(
+            prisma.devices.update({
+              where: { id: device.id },
+              data: {
+                last_seen_at: now,
+                is_connected: true,
+                connection_tier: 'full',
+                connection_error: null,
+                last_status_message: 'FK623 connected — logs pulled successfully',
+              },
+            }).then(() => undefined).catch(() => undefined)
+          );
+        } else if (deviceFailed.has(device.id)) {
+          const errMsg = deviceFailed.get(device.id)!;
+          const isNetworkErr = /ECONNREFUSED|ETIMEDOUT|ENOTFOUND|No response|not connected|unreachable|timed out/i.test(errMsg);
+          if (isNetworkErr) {
+            statusUpdates.push(
+              prisma.devices.update({
+                where: { id: device.id },
+                data: {
+                  is_connected: false,
+                  connection_tier: 'offline',
+                  connection_error: errMsg.slice(0, 500),
+                  last_status_message: `FK623 unreachable: ${errMsg.slice(0, 200)}`,
+                },
+              }).then(() => undefined).catch(() => undefined)
+            );
+          }
+          // Non-network errors (parsing, session, etc.) don't change connectivity status
+        }
+      }
+
+      if (devices.length === 0) {
+        // Legacy single-device path: update tablet-level last_seen_at
+        await prisma.devices.updateMany({
+          where: { tablet_id: tabletId, school_id: schoolId },
+          data: { last_seen_at: now, is_connected: true },
+        });
+      } else {
+        await Promise.allSettled(statusUpdates);
+      }
 
       return { saved: totalSaved, duplicates: totalDuplicates, errors: allErrors };
     } finally {
@@ -145,7 +201,11 @@ async function markTabletOffline(tabletId: bigint, tabletName: string, reason: s
     });
     await prisma.devices.updateMany({
       where: { tablet_id: tabletId },
-      data: { is_connected: false, last_status_message: `Tablet unreachable: ${reason}` },
+      data: {
+        is_connected: false,
+        connection_tier: 'offline',
+        last_status_message: `Tablet unreachable: ${reason}`,
+      },
     });
     logger.warn(
       { tabletId: tabletId.toString(), tabletName, reason },
@@ -156,9 +216,42 @@ async function markTabletOffline(tabletId: bigint, tabletName: string, reason: s
   }
 }
 
+// ── Stale device cleanup ─────────────────────────────────────────────────────
+// Devices that haven't been seen for more than STALE_DEVICE_MS are marked
+// is_connected=false so the frontend never shows them as perpetually ONLINE.
+// This runs before each sweep and is non-blocking.
+
+const STALE_DEVICE_MS = parseInt(process.env.STALE_DEVICE_MS ?? "120000", 10); // 2 min
+
+async function markStaleDevicesOffline(): Promise<void> {
+  try {
+    const cutoff = new Date(Date.now() - STALE_DEVICE_MS);
+    const result = await prisma.devices.updateMany({
+      where: {
+        is_connected: true,
+        last_seen_at: { lt: cutoff },
+      },
+      data: {
+        is_connected: false,
+        connection_tier: 'offline',
+        last_status_message: 'No contact for more than 2 minutes — marked offline',
+      },
+    });
+    if (result.count > 0) {
+      logger.info({ count: result.count }, "[pull-logs] Stale devices marked offline");
+    }
+  } catch (err) {
+    logger.error({ err }, "[pull-logs] Failed to mark stale devices offline");
+  }
+}
+
 // ── Full sweep ───────────────────────────────────────────────────────────────
 
 async function runPullSweep(): Promise<void> {
+  // Mark devices that haven't been seen for >2 min as offline BEFORE sweeping
+  // so the frontend shows accurate status even between sweep cycles.
+  void markStaleDevicesOffline();
+
   let tablets: {
     id: bigint;
     school_id: bigint;

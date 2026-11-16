@@ -174,10 +174,14 @@ export async function deleteTabletDeviceUser(req: Request, res: Response) {
 
 export async function pullTabletDeviceLogs(req: Request, res: Response) {
   const schoolId = resolveSchoolId(req);
+  // deviceUid routes the pull to a specific FK623 on multi-device tablets.
+  // Accept from body (POST) or query string.
+  const deviceUid = (req.body.deviceUid as string) || (req.query.deviceUid as string) || null;
   const result = await tabletService.pullDeviceLogs(
     req.params.id,
     schoolId,
-    Number(req.body.readMark ?? 0)
+    Number(req.body.readMark ?? 0),
+    deviceUid
   );
   res.json(successResponse({ data: result }));
 }

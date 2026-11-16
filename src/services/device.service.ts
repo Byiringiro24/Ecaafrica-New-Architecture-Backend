@@ -961,35 +961,25 @@ export const getDeviceStatus = async (schoolId: string | number | bigint, id: st
     throw new AppError("not_found", "Device not found", 404);
   }
 
-  if (device.tablet_id) {
-    const tabletStatus = await tabletService.getDeviceStatus(device.tablet_id, schoolId);
-    const statusData = (tabletStatus as any)?.data ?? tabletStatus;
-    const updatedDevice = await prisma.devices.findFirst({
-      where: {
-        id: device.id,
-        school_id: toBigInt(schoolId)
-      },
-      include: {
-        tablet: { select: { id: true, url: true, ip: true, port: true, status: true, name: true } }
-      }
-    });
+  // NOTE: We no longer branch on tablet_id here. The per-device ping logic below
+  // handles both single- and multi-device tablets correctly using device_uid.
+  // The old branch called tabletService.getDeviceStatus() → /api/health which
+  // returns the SINGLE legacy FK623 status and is incorrect for multi-device tablets.
 
-    return {
-      ...(updatedDevice ? await formatDeviceWithStatus(updatedDevice, false) : await formatDeviceWithStatus(device, false)),
-      status: statusData?.connected ? "online" : "offline",
-      is_online: Boolean(statusData?.connected),
-      is_connected: Boolean(statusData?.connected),
-      device_status: statusData
-    };
-  }
-
-  // Check real-time tablet connectivity — fetch full /api/health for three-tier status
+  // Check real-time tablet connectivity — three-tier status
+  //   tier 3 = full:   bridge reachable + THIS specific FK623 connected (device_uid match)
+  //   tier 2 = bridge: bridge reachable + THIS FK623 not physically connected
+  //   tier 1 = offline: bridge not reachable at all
+  //
+  // MULTI-DEVICE RULE: When device_uid is set, we call the per-device ping endpoint
+  // /api/devices-config/:device_uid/ping instead of /api/health.
+  // /api/health returns the status of whichever single legacy device the bridge last
+  // touched — it is NOT accurate when multiple FK623 devices share one tablet.
+  // /api/devices-config/:id/ping sends a live STATUS command to the specific FK623
+  // and returns that device's actual connected state.
   const bridgeUrl = resolveTabletBridgeUrl(device);
+  const deviceUid = device.device_uid ?? null;
 
-  // Three-tier status:
-  //   tier 3 = full: bridge reachable + FK623 connected (fk623.connected = true)
-  //   tier 2 = bridge: bridge reachable + FK623 NOT connected (bridgeReady = false / fk623.connected = false)
-  //   tier 1 = offline: bridge not reachable
   let isOnline = false;
   let fk623Connected = false;
   let bridgeReady = false;
@@ -999,15 +989,34 @@ export const getDeviceStatus = async (schoolId: string | number | bigint, id: st
 
   if (bridgeUrl) {
     try {
-      const healthUrl = `${bridgeUrl.replace(/\/+$/, "")}/api/health`;
-      const response = await axios.get(healthUrl, { timeout: 10000, validateStatus: () => true });
-      if (response.status > 0) {
-        isOnline = true;
-        healthData = response.data ?? {};
-        fk623Connected = Boolean(healthData?.fk623?.connected ?? healthData?.connected ?? false);
-        bridgeReady = Boolean(healthData?.bridgeReady ?? healthData?.fk623?.connected ?? false);
-        bridgeRunning = Boolean(healthData?.bridgeRunning ?? healthData?.fk623?.connected ?? fk623Connected);
-        wireguardActive = Boolean(healthData?.vpn?.active ?? healthData?.wireguardActive ?? false);
+      const base = bridgeUrl.replace(/\/+$/, "");
+
+      if (deviceUid) {
+        // ── Per-device check: sends a live STATUS command to this specific FK623 ──
+        // This is the ONLY accurate source for multi-device tablets.
+        const pingUrl = `${base}/api/devices-config/${encodeURIComponent(deviceUid)}/ping`;
+        const response = await axios.get(pingUrl, { timeout: 10000, validateStatus: () => true });
+        if (response.status > 0) {
+          isOnline = true; // bridge is reachable (it responded)
+          healthData = response.data ?? {};
+          fk623Connected = Boolean(healthData?.fk623Reachable ?? healthData?.connected ?? false);
+          bridgeReady = Boolean(healthData?.bridgeReady ?? true);
+          bridgeRunning = true;
+          wireguardActive = true; // if bridge responded, WireGuard is up
+        }
+      } else {
+        // ── Legacy single-device path: use /api/health ────────────────────────
+        // Only used when no device_uid is set (single-device tablets or old records).
+        const healthUrl = `${base}/api/health`;
+        const response = await axios.get(healthUrl, { timeout: 10000, validateStatus: () => true });
+        if (response.status > 0) {
+          isOnline = true;
+          healthData = response.data ?? {};
+          fk623Connected = Boolean(healthData?.fk623?.connected ?? healthData?.connected ?? false);
+          bridgeReady = Boolean(healthData?.bridgeReady ?? healthData?.fk623?.connected ?? false);
+          bridgeRunning = Boolean(healthData?.bridgeRunning ?? healthData?.fk623?.connected ?? fk623Connected);
+          wireguardActive = Boolean(healthData?.vpn?.active ?? healthData?.wireguardActive ?? false);
+        }
       }
     } catch {
       isOnline = false;
@@ -1098,35 +1107,135 @@ export const getAllDeviceStatuses = async (
   tabletId?: string | number | bigint
 ) => {
   const where: any = {
-    school_id: toBigInt(schoolId)
+    school_id: toBigInt(schoolId),
+    is_active: true,
   };
-  
+
   if (tabletId) {
     where.tablet_id = toBigInt(tabletId);
   }
-  
+
   const devices = await prisma.devices.findMany({
     where,
     select: {
       id: true,
       name: true,
+      device_uid: true,
       device_serial: true,
       tablet_ip: true,
       is_connected: true,
+      is_active: true,
+      last_seen_at: true,
       last_connection_at: true,
-      connection_error: true
-    }
+      connection_error: true,
+      last_status_message: true,
+      connection_tier: true,
+      tablet: { select: { url: true, ip: true, port: true } },
+    },
   });
-  
-  return devices.map(device => ({
-    deviceId: device.id.toString(),
-    name: device.name,
-    serialNumber: device.device_serial ?? undefined,
-    ipAddress: device.tablet_ip ?? undefined,
-    isConnected: device.is_connected,
-    lastConnectionAt: device.last_connection_at?.toISOString() ?? undefined,
-    connectionError: device.connection_error ?? undefined
-  }));
+
+  // ── Bulk-fetch per-device live status from each tablet bridge ─────────────
+  // Group devices by tablet URL, then call /api/devices-config/status once per
+  // unique bridge to get all device statuses in a single HTTP request.
+  // This avoids N individual pings when listing all devices.
+  const bridgeStatusCache = new Map<string, Record<string, { connected: boolean; lastError?: string | null; lastAttempt?: string | null }>>();
+
+  for (const device of devices) {
+    const bridgeUrl = normalizeBaseUrl(device.tablet?.url ?? null);
+    if (!bridgeUrl || bridgeStatusCache.has(bridgeUrl)) continue;
+    try {
+      const response = await axios.get(`${bridgeUrl}/api/devices-config/status`, {
+        timeout: 5000,
+        validateStatus: () => true,
+      });
+      if (response.status === 200 && Array.isArray(response.data?.devices)) {
+        const map: Record<string, { connected: boolean; lastError?: string | null; lastAttempt?: string | null }> = {};
+        for (const d of response.data.devices) {
+          if (d.id) map[d.id] = { connected: Boolean(d.connected), lastError: d.lastError ?? null, lastAttempt: d.lastAttempt ?? null };
+        }
+        bridgeStatusCache.set(bridgeUrl, map);
+      } else {
+        bridgeStatusCache.set(bridgeUrl, {}); // bridge reachable but no devices
+      }
+    } catch {
+      // Bridge unreachable — all its devices are offline
+      bridgeStatusCache.set(bridgeUrl, {});
+    }
+  }
+
+  // ── Persist updated connection states ──────────────────────────────────────
+  const now = new Date();
+  const updates: Promise<void>[] = [];
+
+  const result = devices.map(device => {
+    const bridgeUrl = normalizeBaseUrl(device.tablet?.url ?? null);
+    const bridgeMap = bridgeUrl ? (bridgeStatusCache.get(bridgeUrl) ?? null) : null;
+    const deviceUid = device.device_uid;
+
+    let isConnected = device.is_connected;
+    let connectionTier: "full" | "bridge" | "offline" = (device.connection_tier ?? "offline") as "full" | "bridge" | "offline";
+    let lastError = device.connection_error ?? null;
+
+    if (bridgeMap !== null) {
+      // Bridge responded — check per-device status
+      if (deviceUid && bridgeMap[deviceUid] !== undefined) {
+        isConnected = bridgeMap[deviceUid].connected;
+        lastError = bridgeMap[deviceUid].lastError ?? null;
+        connectionTier = isConnected ? "full" : "bridge";
+      } else {
+        // Bridge responded but this device_uid not found — device never registered on bridge
+        isConnected = false;
+        connectionTier = "bridge"; // bridge is up, FK623 device not found/connected
+      }
+    } else if (bridgeUrl === null) {
+      // No bridge configured
+      isConnected = false;
+      connectionTier = "offline";
+    } else {
+      // Bridge unreachable
+      isConnected = false;
+      connectionTier = "offline";
+    }
+
+    // Persist changes asynchronously (non-blocking) if status changed
+    if (isConnected !== device.is_connected || connectionTier !== device.connection_tier) {
+      updates.push(
+        prisma.devices.update({
+          where: { id: device.id },
+          data: {
+            is_connected: isConnected,
+            connection_tier: connectionTier,
+            last_status_message: connectionTier === "full"
+              ? "FK623 connected — ready to scan"
+              : connectionTier === "bridge"
+                ? "Tablet bridge reachable — FK623 device not connected"
+                : "Tablet bridge offline",
+            ...(isConnected ? { last_seen_at: now, last_connection_at: now } : {}),
+            ...(lastError ? { connection_error: lastError } : { connection_error: null }),
+          },
+        }).then(() => undefined).catch(() => undefined)
+      );
+    }
+
+    return {
+      deviceId: device.id.toString(),
+      name: device.name,
+      device_uid: deviceUid,
+      serialNumber: device.device_serial ?? undefined,
+      ipAddress: device.tablet_ip ?? undefined,
+      isConnected,
+      connectionTier,
+      last_seen_at: device.last_seen_at?.toISOString() ?? undefined,
+      lastConnectionAt: device.last_connection_at?.toISOString() ?? undefined,
+      connectionError: lastError ?? undefined,
+      last_status_message: device.last_status_message ?? undefined,
+    };
+  });
+
+  // Fire all DB updates without blocking the response
+  if (updates.length > 0) void Promise.allSettled(updates);
+
+  return result;
 };
 
 export const getDeviceAttendanceConfig = async (schoolId: string | number | bigint, id: string) => {

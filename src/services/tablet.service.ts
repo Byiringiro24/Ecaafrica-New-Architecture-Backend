@@ -699,11 +699,29 @@ export class TabletService {
   }
 
   async getDeviceUsers(id: string | number | bigint, schoolId: string | number | bigint, deviceUid?: string | null) {
-    const { client } = await this.getTabletClient(id, schoolId);
+    const { tablet, client } = await this.getTabletClient(id, schoolId);
     // Route to specific FK623 device if deviceUid is provided
-    const result: any = deviceUid
-      ? await client.getUsersFromDevice(deviceUid)
-      : await client.getUsers();
+    // Auto-reconnect: if the bridge returns device_not_connected, trigger connect then retry once.
+    const fetchUsers = async () => deviceUid
+      ? client.getUsersFromDevice(deviceUid)
+      : client.getUsers();
+
+    let result: any;
+    try {
+      result = await fetchUsers();
+    } catch (err) {
+      const msg = (err as Error).message ?? '';
+      if (/not connected|device_not_connected/i.test(msg)) {
+        // Trigger reconnect then retry
+        await (deviceUid
+          ? client.connectDeviceById(deviceUid).catch(() => client.connectDevice())
+          : client.connectDevice()
+        ).catch(() => null);
+        result = await fetchUsers();
+      } else {
+        throw err;
+      }
+    }
     const users = getTabletUsers(result);
     let savedCount = 0;
 
@@ -772,12 +790,31 @@ export class TabletService {
     return client.renameUser(userId, newName);
   }
 
-  async pullDeviceLogs(id: string | number | bigint, schoolId: string | number | bigint, readMark = 0) {
+  /**
+   * Pull logs from a specific device identified by its bridge UUID.
+   * Used by the auto-pull job to pull each FK623 on a tablet independently.
+   * Skips the findFirst() DB query — uses the provided deviceUid directly.
+   */
+  async pullDeviceLogsByUid(
+    id: string | number | bigint,
+    schoolId: string | number | bigint,
+    readMark = 0,
+    deviceUid: string | null
+  ) {
+    return this.pullDeviceLogs(id, schoolId, readMark, deviceUid);
+  }
+
+  async pullDeviceLogs(id: string | number | bigint, schoolId: string | number | bigint, readMark = 0, deviceUid?: string | null) {
     const { tablet, client } = await this.getTabletClient(id, schoolId);
 
-    // Fetch device record — include mode and dormitory_id for boarding logic
+    // Fetch device record — when deviceUid is provided, target that specific FK623.
+    // Otherwise fall back to the most-recently-updated device on this tablet (single-device path).
     const deviceForConnect = await prisma.devices.findFirst({
-      where: { school_id: toBigInt(schoolId), tablet_id: tablet.id },
+      where: {
+        school_id: toBigInt(schoolId),
+        tablet_id: tablet.id,
+        ...(deviceUid ? { device_uid: deviceUid } : {}),
+      },
       orderBy: { updated_at: 'desc' },
       select: {
         id: true,
@@ -890,11 +927,9 @@ export class TabletService {
       // Bridge says device not connected — connection was lost. Re-connect and retry once.
       if (/not connected|device not connected/i.test(msg)) {
         try {
-          // Use per-device reconnect if device_uid is set, otherwise use global connect-saved
+          // Explicitly trigger reconnect for the specific device (or fall back to global connect-saved)
           if (bridgeDeviceId) {
-            // For per-device: send STATUS to trigger reconnect via the bridge's own auto-connect
-            // The bridge auto-reconnects internally — we just wait and retry
-            await new Promise(r => setTimeout(r, 2000));
+            await client.connectDeviceById(bridgeDeviceId).catch(() => client.connectDevice());
           } else {
             await client.connectDevice();
           }
@@ -1271,9 +1306,12 @@ export class TabletService {
       section_id?: string | number | bigint | null;
       student_type?: string;
       gender?: 'male' | 'female' | null;
+      deviceUid?: string | null;
     } = {}
   ) {
     const { client } = await this.getTabletClient(id, schoolId);
+    // Route push to specific FK623 when deviceUid is provided (multi-device tablets)
+    const targetDeviceUid = input.deviceUid ?? null;
     const where: Prisma.studentsWhereInput = {
       school_id: toBigInt(schoolId),
       deleted_at: null,
@@ -1340,7 +1378,9 @@ export class TabletService {
 
       try {
         const addResult: any = await withTabletOfflineRetry(
-          () => client.addUser(userId, name, photoUrl),
+          () => targetDeviceUid
+            ? client.addUserToDevice(targetDeviceUid, userId, name, photoUrl)
+            : client.addUser(userId, name, photoUrl),
           { timeoutMs: 5 * 60 * 1000, retryIntervalMs: 2000 }
         );
         // Verify the bridge actually accepted the user — don't trust a silent false

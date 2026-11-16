@@ -1902,6 +1902,7 @@ model devices {
   is_connected        Boolean           @default(false)
   last_connection_at  DateTime?         @db.Timestamptz(3)
   license_number      Int?
+  connection_tier     String?           @default("offline") @db.VarChar(10)
   product_code        String?           @db.VarChar(50)
   product_name        String?           @db.VarChar(100)
   tablet_id           BigInt?
@@ -1923,6 +1924,7 @@ model devices {
   @@index([dormitory_id])
   @@index([location_scope])
   @@index([is_connected])
+  @@index([connection_tier])
   @@index([last_connection_at])
   @@index([created_at])
   @@index([updated_at])
