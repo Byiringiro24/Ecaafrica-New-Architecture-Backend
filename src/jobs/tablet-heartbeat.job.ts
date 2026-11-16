@@ -71,22 +71,24 @@ async function runHeartbeatSweep(): Promise<void> {
         },
       }).catch(() => null);
 
-      // If reachable, also update last_seen_at on all linked devices
-      // so the 10-minute grace window stays fresh
+      // If reachable, update tablet status and attempt per-device pings.
+      // We do NOT blanket-set last_seen_at on all devices here because that
+      // would make an OFFLINE FK623 appear online just because the tablet is up.
+      // Per-device status is handled by:
+      //   - pull-logs job (every 5s, per-device tracking)
+      //   - getDeviceStatus calls (on-demand, per-device ping)
+      // We only update the tablet record itself.
       if (reachable) {
-        await prisma.devices.updateMany({
-          where: { tablet_id: tablet.id },
-          data: { last_seen_at: new Date() },
-        }).catch(() => null);
         online++;
       } else {
-        // Tablet is not reachable — mark linked devices as disconnected
-        // so the sidebar dot correctly shows offline even if is_connected was
-        // previously true from an old FK623 connection
+        // Tablet is not reachable — mark linked devices offline
+        // This is safe to do in bulk because if the entire tablet is unreachable,
+        // ALL its FK623 devices are definitely also unreachable.
         await prisma.devices.updateMany({
           where: { tablet_id: tablet.id },
           data: {
             is_connected: false,
+            connection_tier: 'offline',
             last_status_message: 'Tablet bridge unreachable — check WireGuard VPN',
           },
         }).catch(() => null);
