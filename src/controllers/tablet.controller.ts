@@ -18,6 +18,69 @@ const resolveSchoolId = (req: Request): bigint => {
 };
 
 /**
+ * Guard: verify that a FK623 device associated with a tablet is not stale-offline
+ * before executing commands that require a live connection.
+ *
+ * Uses the connection_tier from the DB (written by the pull-logs job + per-device pings).
+ * If tier = "offline" AND last_seen_at is older than 5 minutes, the command is blocked
+ * with a clear 503 response describing which device is offline.
+ *
+ * We deliberately do NOT block when tier = "bridge" (tablet up, FK623 not connected)
+ * because pull-logs and similar commands trigger a reconnect attempt automatically.
+ * We also do NOT block "full" tier — the device is confirmed connected.
+ *
+ * deviceUid (optional): routes the check to the specific FK623 device rather than
+ * the first device found on the tablet.
+ */
+async function guardDeviceOnline(
+  tabletId: bigint,
+  schoolId: bigint,
+  deviceUid: string | null
+): Promise<void> {
+  const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+  const device = await prisma.devices.findFirst({
+    where: {
+      tablet_id: tabletId,
+      school_id: schoolId,
+      is_active: true,
+      ...(deviceUid ? { device_uid: deviceUid } : {}),
+    },
+    orderBy: { updated_at: 'desc' },
+    select: {
+      id: true,
+      name: true,
+      device_uid: true,
+      is_connected: true,
+      connection_tier: true,
+      last_seen_at: true,
+      last_status_message: true,
+    },
+  });
+
+  if (!device) return; // no device configured — let the command proceed and fail naturally
+
+  const tier = device.connection_tier as string | null;
+  const lastSeen = device.last_seen_at ? new Date(device.last_seen_at) : null;
+  const isStaleOffline =
+    tier === 'offline' &&
+    (!lastSeen || Date.now() - lastSeen.getTime() > STALE_THRESHOLD_MS);
+
+  if (isStaleOffline) {
+    const deviceLabel = device.name ?? device.device_uid ?? String(device.id);
+    const lastSeenLabel = lastSeen
+      ? `Last seen ${Math.round((Date.now() - lastSeen.getTime()) / 60000)} minutes ago.`
+      : 'Never seen online.';
+    throw new AppError(
+      'service_unavailable',
+      `FK623 device "${deviceLabel}" is OFFLINE. ${lastSeenLabel} ` +
+        'Check the device power, local network connection, and WireGuard VPN.',
+      503
+    );
+  }
+}
+
+/**
  * Get all tablets with pagination and filters
  */
 export async function getAllTablets(req: Request, res: Response) {
@@ -153,6 +216,7 @@ export async function pullTabletDeviceUsers(req: Request, res: Response) {
   const schoolId = resolveSchoolId(req);
   // deviceUid: optional query param — routes to specific FK623 on multi-device tablets
   const deviceUid = (req.query.deviceUid as string) || null;
+  await guardDeviceOnline(BigInt(req.params.id), schoolId, deviceUid);
   const result = await tabletService.getDeviceUsers(req.params.id, schoolId, deviceUid);
   res.json(successResponse({ data: result }));
 }
@@ -177,6 +241,8 @@ export async function pullTabletDeviceLogs(req: Request, res: Response) {
   // deviceUid routes the pull to a specific FK623 on multi-device tablets.
   // Accept from body (POST) or query string.
   const deviceUid = (req.body.deviceUid as string) || (req.query.deviceUid as string) || null;
+  // Guard: block if device is stale-offline (>5 min no contact)
+  await guardDeviceOnline(BigInt(req.params.id), schoolId, deviceUid);
   const result = await tabletService.pullDeviceLogs(
     req.params.id,
     schoolId,
@@ -195,6 +261,7 @@ export async function pushTabletDeviceStudents(req: Request, res: Response) {
 export async function clearTabletDeviceLogs(req: Request, res: Response) {
   const schoolId = resolveSchoolId(req);
   const deviceUid = (req.query.deviceUid as string) || null;
+  await guardDeviceOnline(BigInt(req.params.id), schoolId, deviceUid);
   const result = await tabletService.clearDeviceLogs(req.params.id, schoolId, deviceUid);
   res.json(successResponse(result));
 }
@@ -202,6 +269,7 @@ export async function clearTabletDeviceLogs(req: Request, res: Response) {
 export async function clearTabletDeviceData(req: Request, res: Response) {
   const schoolId = resolveSchoolId(req);
   const deviceUid = (req.query.deviceUid as string) || null;
+  await guardDeviceOnline(BigInt(req.params.id), schoolId, deviceUid);
   const result = await tabletService.clearDeviceData(req.params.id, schoolId, deviceUid);
   res.json(successResponse(result));
 }

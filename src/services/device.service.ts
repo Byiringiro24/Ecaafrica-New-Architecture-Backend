@@ -377,7 +377,7 @@ const formatDeviceWithStatus = async (
     //   "full"   = FK623 confirmed connected (is_connected=true from pull-logs job)
     //   "bridge" = tablet bridge reachable but FK623 not confirmed (cached only)
     //   "offline"= not reachable
-    connection_tier: isConnected ? "full" : (tabletOnline || recentHeartbeat ? "bridge" : "offline"),
+    connection_tier: (record.connection_tier as "full" | "bridge" | "offline") ?? (isConnected ? "full" : (tabletOnline || recentHeartbeat ? "bridge" : "offline")),
     last_seen_at: lastSeenAt?.toISOString() ?? null,
     last_sync_at: record.last_sync_at?.toISOString() ?? null,
     last_status_message: record.last_status_message ?? null,
