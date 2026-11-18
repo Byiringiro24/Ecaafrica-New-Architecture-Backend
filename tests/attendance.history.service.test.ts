@@ -90,7 +90,6 @@ describe("manual attendance history date filtering", () => {
     expect(mockedPrisma.attendance_records.findMany).toHaveBeenCalledWith({
       where: {
         school_id: 1n,
-        scan_method: "manual",
         session: {
           session_date: {
             gte: new Date("2026-08-23T00:00:00.000Z"),

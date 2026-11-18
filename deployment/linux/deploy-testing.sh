@@ -107,16 +107,12 @@ ENV_FILE="$BACKEND_DIR/.env"
 if [ -f "$ENV_FILE" ]; then
   echo "  ✓ Existing .env found — only adding missing keys"
 else
-  echo "  ✓ No .env found — creating with defaults"
+  echo "  ERROR: Provision $ENV_FILE with the server secrets before deploying"
+  exit 1
 fi
 
 # ── Core ──────────────────────────────────────────────────────
-# DATABASE_URL: defaults to architecturetest — change on server if needed
-merge_env "DATABASE_URL"               '"postgresql://postgres:2211@localhost:5432/architecturetest?schema=public"' "$ENV_FILE"
-merge_env "JWT_SECRET"                 "1b1a90a340949c666a212b212de76a9c7e14d24a5cd9c6b1de32d517668501b1" "$ENV_FILE"
-merge_env "JWT_REFRESH_SECRET"         "hk3BkIhG-cEMddfdK3FIGsAgRL_16mQWxKDgnaRvdRwzbWC9ICwhQO0Kashg-DQEWjCnKz3tpxaG-K9Y2gyHrg" "$ENV_FILE"
-merge_env "PLATFORM_JWT_SECRET"        "Gqwfm4cF1q3S2uX5nvdRkUZRQU40ZmcGRCBs4H666mgez6mNaU5iS7Mhjo3wSvKssqV2Sa0B7sFOk49181MEEw" "$ENV_FILE"
-merge_env "PLATFORM_JWT_REFRESH_SECRET" "CL3gr3UNYYqfdcs8zdzvbMWkLn3rFRQn_BbkxOfOgFy1" "$ENV_FILE"
+# Database and signing/storage credentials are provisioned in the server env.
 merge_env "JWT_EXPIRES_IN"             "30m"  "$ENV_FILE"
 merge_env "JWT_REFRESH_EXPIRES_IN"     "30d"  "$ENV_FILE"
 
@@ -131,6 +127,20 @@ merge_env "TRUST_PROXY"      "true"           "$ENV_FILE"
 merge_env "CORS_ORIGIN" \
   "https://staging.ecareafrica.net,http://staging.ecareafrica.net,https://testing.ecareafrica.net,http://testing.ecareafrica.net,https://testing-api.ecareafrica.net,http://testing-api.ecareafrica.net" \
   "$ENV_FILE"
+# Preserve existing CORS origins and add the origins required by these apps.
+ensure_cors_origin() {
+  local origin="$1"
+  local current updated
+  current=$(grep '^CORS_ORIGIN=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d "\"'")
+  if printf '%s\n' "$current" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -Fqx "$origin"; then
+    return
+  fi
+  if [ -n "$current" ]; then updated="$current,$origin"; else updated="$origin"; fi
+  sed -i "s|^CORS_ORIGIN=.*|CORS_ORIGIN=$updated|" "$ENV_FILE"
+}
+ensure_cors_origin "https://staging.ecareafrica.net"
+ensure_cors_origin "https://testing.ecareafrica.net"
+ensure_cors_origin "https://testing-api.ecareafrica.net"
 
 merge_env "RATE_LIMIT_ENABLED"   "false"   "$ENV_FILE"
 merge_env "RATE_LIMIT_WINDOW_MS" "900000"  "$ENV_FILE"
@@ -140,16 +150,11 @@ merge_env "RATE_LIMIT_MAX"       "200"     "$ENV_FILE"
 merge_env "S3_ENDPOINT"       "https://abcd1234efgh.r2.cloudflarestorage.com" "$ENV_FILE"
 merge_env "S3_REGION"         "auto"                                           "$ENV_FILE"
 merge_env "S3_BUCKET"         "ecareafrica-storage"                            "$ENV_FILE"
-merge_env "S3_ACCESS_KEY_ID"  "RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g" "$ENV_FILE"
-merge_env "S3_SECRET_ACCESS_KEY" "RboLlUqEo8Ojh9ALgoWC_yzWuVeZFoN2dlX4XKZ0eCZh7g" "$ENV_FILE"
 merge_env "S3_PUBLIC_URL"     "https://pub.r2.dev"                            "$ENV_FILE"
 
 # ── Email ─────────────────────────────────────────────────────
 merge_env "SMTP_HOST" "smtp.gmail.com"                   "$ENV_FILE"
 merge_env "SMTP_PORT" "587"                              "$ENV_FILE"
-merge_env "SMTP_USER" "netrackdevelopement@gmail.com"   "$ENV_FILE"
-merge_env "SMTP_PASS" "elkrdmcpmksazazy"                 "$ENV_FILE"
-merge_env "SMTP_FROM" "netrackdevelopement@gmail.com"   "$ENV_FILE"
 
 # ── Services ──────────────────────────────────────────────────
 merge_env "REDIS_URL"           "redis://localhost:6379"             "$ENV_FILE"
@@ -179,7 +184,16 @@ merge_env "SSE_CONNECT_STAGGER_MS"  "200"   "$ENV_FILE"
 merge_env "SSE_DEDUP_CACHE_SIZE"    "10000" "$ENV_FILE"
 
 echo "✓ .env merge complete — existing values untouched"
-echo "  Active DATABASE_URL : $(grep '^DATABASE_URL=' "$ENV_FILE" | head -1)"
+required_keys="DATABASE_URL JWT_SECRET JWT_REFRESH_SECRET PLATFORM_JWT_SECRET PLATFORM_JWT_REFRESH_SECRET S3_ENDPOINT S3_REGION S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY S3_PUBLIC_URL"
+for key in $required_keys; do
+  value=$(grep "^${key}=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d "\"'[:space:]")
+  if [ -z "$value" ]; then
+    echo "  ERROR: Required server setting is missing: $key"
+    exit 1
+  fi
+  unset value
+done
+echo "  Active DATABASE_URL : configured (value hidden)"
 echo "  Active CORS_ORIGIN  : $(grep '^CORS_ORIGIN='  "$ENV_FILE" | head -1)"
 echo "  Active PORT         : $(grep '^PORT='         "$ENV_FILE" | head -1)"
 
