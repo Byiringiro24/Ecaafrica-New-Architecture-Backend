@@ -67,6 +67,25 @@ for key in $required_keys; do
   unset value
 done
 
+# Validate the application database credentials before any service is stopped.
+# Use DATABASE_URL's own role instead of assuming the server's postgres admin
+# password matches the application password.
+DB_URL=$(grep '^DATABASE_URL=' "$ENV_FILE" | tail -1 | cut -d= -f2-)
+DB_URL="${DB_URL#\"}"
+DB_URL="${DB_URL%\"}"
+DB_URL="${DB_URL#\'}"
+DB_URL="${DB_URL%\'}"
+DB_CHECK_URL=$(DATABASE_URL="$DB_URL" node -e 'const url = new URL(process.env.DATABASE_URL); url.searchParams.delete("schema"); process.stdout.write(url.toString())') || {
+  echo "ERROR: DATABASE_URL is invalid; no services were stopped"
+  exit 1
+}
+if ! psql "$DB_CHECK_URL" -v ON_ERROR_STOP=1 -q -c 'SELECT 1' >/dev/null 2>&1; then
+  echo "ERROR: Application database connection failed; no services were stopped"
+  exit 1
+fi
+unset DB_URL
+echo "✓ Application database connection validated"
+
 # ── 1. Stop PM2 processes (testing + staging, NOT production) ─
 echo ""
 echo "[1/10] Stopping testing/staging PM2 processes..."
@@ -213,18 +232,9 @@ echo "  Active DATABASE_URL : configured (value hidden)"
 echo "  Active CORS_ORIGIN  : $(grep '^CORS_ORIGIN='  "$ENV_FILE" | head -1)"
 echo "  Active PORT         : $(grep '^PORT='         "$ENV_FILE" | head -1)"
 
-# ── 4. Ensure DB exists (uses TCP to avoid peer auth) ─────────
+# ── 4. Confirm the existing database is available ─────────────
 echo ""
-echo "[4/10] Ensuring database exists..."
-DB_NAME=$(grep '^DATABASE_URL=' "$ENV_FILE" | sed "s|.*5432/\([^?\"]*\).*|\1|")
-DB_PASS=$(grep '^DATABASE_URL=' "$ENV_FILE" | sed 's/.*:\([^:@]*\)@.*/\1/')
-echo "  DB name: $DB_NAME"
-PGPASSWORD="$DB_PASS" psql -U postgres -h 127.0.0.1 -tc \
-  "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" \
-  | grep -q 1 \
-  || PGPASSWORD="$DB_PASS" psql -U postgres -h 127.0.0.1 \
-       -c "CREATE DATABASE \"$DB_NAME\" OWNER postgres;"
-echo "✓ Database $DB_NAME ready"
+echo "[4/10] Database connection validated; Prisma will apply migrations..."
 
 # ── 5. Backend: install + prisma + build ─────────────────────
 echo ""
@@ -237,54 +247,6 @@ echo "  Running prisma generate + migrate deploy..."
 npx prisma generate --schema src/models/schema.prisma
 npx prisma migrate deploy --schema src/models/schema.prisma
 echo "✓ Prisma ready (all migrations applied)"
-
-# ── Safety: apply critical columns that may be missing if DB was ──
-# cloned from an older dump (migration marked applied but column absent)
-echo "  Applying safety column patches to $DB_NAME..."
-PGPASSWORD="$DB_PASS" psql -U postgres -h 127.0.0.1 -d "$DB_NAME" -q << 'SQLEOF'
--- attendance_logs table (migration 20260705093000)
-CREATE TABLE IF NOT EXISTS "attendance_logs" (
-  "id" BIGSERIAL PRIMARY KEY,
-  "school_id" BIGINT,
-  "log_id" TEXT,
-  "user_id" TEXT,
-  "student_id" TEXT,
-  "student_device_id" TEXT,
-  "student_name" TEXT,
-  "class_name" TEXT,
-  "section" TEXT,
-  "device_id" TEXT,
-  "authentication_method" TEXT,
-  "direction" TEXT,
-  "timestamp" TIMESTAMPTZ,
-  "status" TEXT,
-  "attendance_period" TEXT,
-  "raw_data" JSONB,
-  "sync_state" VARCHAR(20) NOT NULL DEFAULT 'synced',
-  "is_flagged" BOOLEAN NOT NULL DEFAULT FALSE,
-  "flag_reason" VARCHAR(255),
-  "synced_at" TIMESTAMPTZ,
-  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE UNIQUE INDEX IF NOT EXISTS "attendance_logs_log_id_device_id_key"
-  ON "attendance_logs" ("log_id", "device_id");
-CREATE INDEX IF NOT EXISTS "attendance_logs_school_id_idx"
-  ON "attendance_logs" ("school_id");
-CREATE INDEX IF NOT EXISTS "attendance_logs_timestamp_idx"
-  ON "attendance_logs" ("timestamp");
-
--- boarding_attendance_records.dormitory_id (migration 20261007000000)
-ALTER TABLE "boarding_attendance_records"
-  ADD COLUMN IF NOT EXISTS "dormitory_id" BIGINT;
-CREATE INDEX IF NOT EXISTS "boarding_attendance_records_dormitory_id_idx"
-  ON "boarding_attendance_records" ("dormitory_id");
-
--- Activate pending/inactive users so they can log in to the portal
--- pending = account created but email not verified — safe to activate
-UPDATE users SET status = 'active'
-  WHERE status IN ('pending', 'inactive');
-SQLEOF
-echo "✓ Safety patches applied"
 
 echo "  Building backend TypeScript..."
 npm run build
