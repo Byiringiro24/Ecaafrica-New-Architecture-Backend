@@ -75,16 +75,45 @@ DB_URL="${DB_URL#\"}"
 DB_URL="${DB_URL%\"}"
 DB_URL="${DB_URL#\'}"
 DB_URL="${DB_URL%\'}"
-DB_CHECK_URL=$(DATABASE_URL="$DB_URL" node -e 'const url = new URL(process.env.DATABASE_URL); url.searchParams.delete("schema"); process.stdout.write(url.toString())') || {
-  echo "ERROR: DATABASE_URL is invalid; no services were stopped"
-  exit 1
-}
-if ! psql "$DB_CHECK_URL" -v ON_ERROR_STOP=1 -q -c 'SELECT 1' >/dev/null 2>&1; then
-  echo "ERROR: Application database connection failed; no services were stopped"
-  exit 1
+DB_NAME=$(DATABASE_URL="$DB_URL" node -e 'const url = new URL(process.env.DATABASE_URL); process.stdout.write(decodeURIComponent(url.pathname.slice(1)))' 2>/dev/null || true)
+DB_CHECK_URL=""
+if [ "$DB_NAME" = "architecturetest" ]; then
+  DB_CHECK_URL=$(DATABASE_URL="$DB_URL" node -e 'const url = new URL(process.env.DATABASE_URL); url.searchParams.delete("schema"); process.stdout.write(url.toString())' 2>/dev/null || true)
 fi
-unset DB_URL
-echo "✓ Application database connection validated"
+
+if [ "$DB_NAME" != "architecturetest" ] || [ -z "$DB_CHECK_URL" ] || ! psql "$DB_CHECK_URL" -v ON_ERROR_STOP=1 -q -c 'SELECT 1' >/dev/null 2>&1; then
+  if [ ! -r /dev/tty ]; then
+    echo "ERROR: Configure $ENV_FILE DATABASE_URL for architecturetest; interactive password input is unavailable (no services were stopped)"
+    exit 1
+  fi
+
+  echo "Existing DATABASE_URL does not connect to architecturetest."
+  read -r -s -p "PostgreSQL password for postgres@127.0.0.1/architecturetest: " DB_PASSWORD </dev/tty
+  printf '\n' >/dev/tty
+  if [ -z "$DB_PASSWORD" ]; then
+    echo "ERROR: Empty PostgreSQL password; no services were stopped"
+    exit 1
+  fi
+
+  DB_URL=$(DATABASE_PASSWORD="$DB_PASSWORD" node -e 'const url = new URL("postgresql://postgres@127.0.0.1:5432/architecturetest"); url.password = process.env.DATABASE_PASSWORD; url.searchParams.set("schema", "public"); url.searchParams.set("sslmode", "disable"); process.stdout.write(url.toString())') || {
+    unset DB_PASSWORD
+    echo "ERROR: Could not construct architecturetest DATABASE_URL; no services were stopped"
+    exit 1
+  }
+  unset DB_PASSWORD
+  DB_CHECK_URL=$(DATABASE_URL="$DB_URL" node -e 'const url = new URL(process.env.DATABASE_URL); url.searchParams.delete("schema"); process.stdout.write(url.toString())')
+  if ! psql "$DB_CHECK_URL" -v ON_ERROR_STOP=1 -q -c 'SELECT 1' >/dev/null 2>&1; then
+    unset DB_URL DB_CHECK_URL
+    echo "ERROR: Could not connect to architecturetest with the supplied credentials; no services were stopped"
+    exit 1
+  fi
+
+  DATABASE_URL="$DB_URL" ENV_FILE="$ENV_FILE" node -e 'const fs = require("fs"); const path = process.env.ENV_FILE; const lines = fs.readFileSync(path, "utf8").split(/\r?\n/); const kept = []; let inserted = false; for (const line of lines) { if (line.startsWith("DATABASE_URL=")) { if (!inserted) { kept.push(`DATABASE_URL="${process.env.DATABASE_URL}"`); inserted = true; } } else kept.push(line); } if (!inserted) kept.push(`DATABASE_URL="${process.env.DATABASE_URL}"`); const mode = fs.statSync(path).mode; const temp = `${path}.${process.pid}.tmp`; fs.writeFileSync(temp, kept.join("\n"), { mode }); fs.renameSync(temp, path);'
+  echo "✓ Server .env updated to use architecturetest; value hidden"
+fi
+
+unset DB_URL DB_CHECK_URL DB_NAME
+echo "✓ Application database connection validated for architecturetest"
 
 # ── 1. Stop PM2 processes (testing + staging, NOT production) ─
 echo ""
