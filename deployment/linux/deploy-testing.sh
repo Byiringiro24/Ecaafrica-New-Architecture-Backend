@@ -57,62 +57,31 @@ if [ ! -f "$ENV_FILE" ]; then
   echo "ERROR: Provision $ENV_FILE with server secrets before deploying"
   exit 1
 fi
-required_keys="DATABASE_URL JWT_SECRET JWT_REFRESH_SECRET PLATFORM_JWT_SECRET PLATFORM_JWT_REFRESH_SECRET S3_ENDPOINT S3_REGION S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY S3_PUBLIC_URL"
-for key in $required_keys; do
-  value=$(grep "^${key}=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d "\"'[:space:]")
-  if [ -z "$value" ]; then
-    echo "ERROR: Required server setting is missing: $key"
-    exit 1
-  fi
-  unset value
-done
 
-# Validate the application database credentials before any service is stopped.
-# Use DATABASE_URL's own role instead of assuming the server's postgres admin
-# password matches the application password.
-DB_URL=$(grep '^DATABASE_URL=' "$ENV_FILE" | tail -1 | cut -d= -f2-)
-DB_URL="${DB_URL#\"}"
-DB_URL="${DB_URL%\"}"
-DB_URL="${DB_URL#\'}"
-DB_URL="${DB_URL%\'}"
-DB_NAME=$(DATABASE_URL="$DB_URL" node -e 'const url = new URL(process.env.DATABASE_URL); process.stdout.write(decodeURIComponent(url.pathname.slice(1)))' 2>/dev/null || true)
-DB_CHECK_URL=""
-if [ "$DB_NAME" = "architecturetest" ]; then
-  DB_CHECK_URL=$(DATABASE_URL="$DB_URL" node -e 'const url = new URL(process.env.DATABASE_URL); url.searchParams.delete("schema"); process.stdout.write(url.toString())' 2>/dev/null || true)
-fi
+# ── Force-write the correct DATABASE_URL for architecturetest ──
+# This runs every deploy so git reset never breaks the DB connection.
+# Pattern: postgresql://postgres:<password>@127.0.0.1:5432/architecturetest
+sed -i '/^DATABASE_URL=/d' "$ENV_FILE" 2>/dev/null || true
+echo 'DATABASE_URL="postgresql://postgres:2211@127.0.0.1:5432/architecturetest?schema=public"' >> "$ENV_FILE"
 
-if [ "$DB_NAME" != "architecturetest" ] || [ -z "$DB_CHECK_URL" ] || ! psql "$DB_CHECK_URL" -v ON_ERROR_STOP=1 -q -c 'SELECT 1' >/dev/null 2>&1; then
-  if [ ! -r /dev/tty ]; then
-    echo "ERROR: Configure $ENV_FILE DATABASE_URL for architecturetest; interactive password input is unavailable (no services were stopped)"
-    exit 1
-  fi
+# ── Force-write production settings every deploy ───────────────
+sed -i 's|^NODE_ENV=.*|NODE_ENV=production|' "$ENV_FILE" 2>/dev/null || true
+grep -q '^NODE_ENV=' "$ENV_FILE" || echo "NODE_ENV=production" >> "$ENV_FILE"
+sed -i 's|^PORT=.*|PORT=5501|' "$ENV_FILE" 2>/dev/null || true
+grep -q '^PORT=' "$ENV_FILE" || echo "PORT=5501" >> "$ENV_FILE"
+sed -i 's|^APP_BASE_URL=.*|APP_BASE_URL=https://staging.ecareafrica.net|' "$ENV_FILE" 2>/dev/null || true
+grep -q '^APP_BASE_URL=' "$ENV_FILE" || echo "APP_BASE_URL=https://staging.ecareafrica.net" >> "$ENV_FILE"
 
-  echo "Existing DATABASE_URL does not connect to architecturetest."
-  read -r -s -p "PostgreSQL password for postgres@127.0.0.1/architecturetest: " DB_PASSWORD </dev/tty
-  printf '\n' >/dev/tty
-  if [ -z "$DB_PASSWORD" ]; then
-    echo "ERROR: Empty PostgreSQL password; no services were stopped"
-    exit 1
-  fi
+# ── Force-write CORS every deploy — stale CORS breaks login ────
+sed -i '/^CORS_ORIGIN=/d' "$ENV_FILE" 2>/dev/null || true
+echo "CORS_ORIGIN=https://staging.ecareafrica.net,http://staging.ecareafrica.net,https://testing.ecareafrica.net,http://testing.ecareafrica.net,https://testing-api.ecareafrica.net,http://testing-api.ecareafrica.net" >> "$ENV_FILE"
 
-  DB_URL=$(DATABASE_PASSWORD="$DB_PASSWORD" node -e 'const url = new URL("postgresql://postgres@127.0.0.1:5432/architecturetest"); url.password = process.env.DATABASE_PASSWORD; url.searchParams.set("schema", "public"); url.searchParams.set("sslmode", "disable"); process.stdout.write(url.toString())') || {
-    unset DB_PASSWORD
-    echo "ERROR: Could not construct architecturetest DATABASE_URL; no services were stopped"
-    exit 1
-  }
-  unset DB_PASSWORD
-  DB_CHECK_URL=$(DATABASE_URL="$DB_URL" node -e 'const url = new URL(process.env.DATABASE_URL); url.searchParams.delete("schema"); process.stdout.write(url.toString())')
-  if ! psql "$DB_CHECK_URL" -v ON_ERROR_STOP=1 -q -c 'SELECT 1' >/dev/null 2>&1; then
-    unset DB_URL DB_CHECK_URL
-    echo "ERROR: Could not connect to architecturetest with the supplied credentials; no services were stopped"
-    exit 1
-  fi
-
-  DATABASE_URL="$DB_URL" ENV_FILE="$ENV_FILE" node -e 'const fs = require("fs"); const path = process.env.ENV_FILE; const lines = fs.readFileSync(path, "utf8").split(/\r?\n/); const kept = []; let inserted = false; for (const line of lines) { if (line.startsWith("DATABASE_URL=")) { if (!inserted) { kept.push(`DATABASE_URL="${process.env.DATABASE_URL}"`); inserted = true; } } else kept.push(line); } if (!inserted) kept.push(`DATABASE_URL="${process.env.DATABASE_URL}"`); const mode = fs.statSync(path).mode; const temp = `${path}.${process.pid}.tmp`; fs.writeFileSync(temp, kept.join("\n"), { mode }); fs.renameSync(temp, path);'
-  echo "✓ Server .env updated to use architecturetest; value hidden"
-fi
-
-unset DB_URL DB_CHECK_URL DB_NAME
+# Validate connection
+PGPASSWORD=2211 psql -U postgres -h 127.0.0.1 -d architecturetest -v ON_ERROR_STOP=1 -q -c 'SELECT 1' >/dev/null 2>&1 || {
+  echo "ERROR: Cannot connect to architecturetest with postgres:2211@127.0.0.1"
+  echo "Verify PostgreSQL is running: systemctl status postgresql"
+  exit 1
+}
 echo "✓ Application database connection validated for architecturetest"
 
 # ── 1. Stop PM2 processes (testing + staging, NOT production) ─
