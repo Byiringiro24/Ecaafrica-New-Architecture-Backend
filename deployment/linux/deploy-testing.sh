@@ -51,6 +51,22 @@ echo "  Testing port: $TESTING_PORT"
 echo "  Staging port: $STAGING_PORT"
 echo "============================================"
 
+# Preflight required secrets before stopping any live testing/staging process.
+ENV_FILE="$BACKEND_DIR/.env"
+if [ ! -f "$ENV_FILE" ]; then
+  echo "ERROR: Provision $ENV_FILE with server secrets before deploying"
+  exit 1
+fi
+required_keys="DATABASE_URL JWT_SECRET JWT_REFRESH_SECRET PLATFORM_JWT_SECRET PLATFORM_JWT_REFRESH_SECRET S3_ENDPOINT S3_REGION S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY S3_PUBLIC_URL"
+for key in $required_keys; do
+  value=$(grep "^${key}=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d "\"'[:space:]")
+  if [ -z "$value" ]; then
+    echo "ERROR: Required server setting is missing: $key"
+    exit 1
+  fi
+  unset value
+done
+
 # ── 1. Stop PM2 processes (testing + staging, NOT production) ─
 echo ""
 echo "[1/10] Stopping testing/staging PM2 processes..."
